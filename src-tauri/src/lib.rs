@@ -5,7 +5,7 @@ mod normalization;
 mod commands;
 
 use storage::Database;
-use config::TokenStore;
+use config::{TokenStore, Config};
 use std::sync::Mutex;
 use std::collections::HashMap;
 use tauri::Manager;
@@ -34,13 +34,25 @@ pub fn run() {
             let token_store: TokenStore = HashMap::new();
             app.manage(Mutex::new(token_store));
             
+            // Load config and sync sources to database
+            if let Ok(config) = config::load_config() {
+                eprintln!("[UmbraRelay] Loaded config, syncing sources to database...");
+                sync_config_to_database(app.handle(), &config);
+            } else {
+                eprintln!("[UmbraRelay] Failed to load config or config file doesn't exist");
+            }
+            
             // Start background polling service
             let app_handle = app.handle().clone();
             std::thread::spawn(move || {
+                // Create a multi-threaded runtime and keep it alive
                 let rt = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
-                rt.block_on(async {
+                // Spawn the background service on the runtime
+                rt.spawn(async move {
                     background_polling_service(app_handle).await;
                 });
+                // Keep the runtime alive for the thread's lifetime
+                rt.block_on(std::future::pending::<()>());
             });
             
             Ok(())
@@ -59,6 +71,141 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+// Sync config file sources to database on startup
+fn sync_config_to_database(app: &tauri::AppHandle, config: &Config) {
+    use serde_json::json;
+    
+    let db_state: tauri::State<'_, Mutex<Database>> = app.state();
+    let db = match db_state.lock() {
+        Ok(db) => db,
+        Err(e) => {
+            eprintln!("[UmbraRelay] Failed to lock database for config sync: {}", e);
+            return;
+        }
+    };
+    
+    // Get existing sources to check for duplicates and track what's in config
+    let existing_sources = match db.get_all_sources() {
+        Ok(sources) => sources,
+        Err(e) => {
+            eprintln!("[UmbraRelay] Failed to get existing sources: {}", e);
+            return;
+        }
+    };
+    
+    // Build set of sources that should exist in config
+    let mut config_source_keys = std::collections::HashSet::new();
+    
+    // Helper to check if a source already exists (by name and type)
+    let source_exists = |name: &str, source_type: &str| -> bool {
+        existing_sources.iter().any(|s| s.name == name && s.source_type == source_type)
+    };
+    
+    // Helper to get source key for matching
+    let get_source_key = |name: &str, source_type: &str| -> String {
+        format!("{}:{}", source_type, name)
+    };
+    
+    // Sync RSS sources
+    for rss_source in &config.rss {
+        let key = get_source_key(&rss_source.name, "rss");
+        config_source_keys.insert(key.clone());
+        
+        if source_exists(&rss_source.name, "rss") {
+            // Source exists, ensure it's enabled (in case it was previously disabled)
+            if let Some(existing) = existing_sources.iter().find(|s| s.name == rss_source.name && s.source_type == "rss") {
+                if !existing.enabled {
+                    if let Err(e) = db.update_source(existing.id, None, None, Some(true)) {
+                        eprintln!("[UmbraRelay] Failed to re-enable RSS source '{}': {}", rss_source.name, e);
+                    } else {
+                        eprintln!("[UmbraRelay] Re-enabled RSS source '{}'", rss_source.name);
+                    }
+                }
+            }
+            continue;
+        }
+        
+        let config_json = json!({
+            "url": rss_source.url,
+            "poll_interval": rss_source.poll_interval,
+            "_from_config": true  // Marker to track config-sourced items
+        });
+        
+        match db.create_source("rss", &rss_source.name, &config_json.to_string()) {
+            Ok(id) => {
+                eprintln!("[UmbraRelay] Created RSS source '{}' (id: {})", rss_source.name, id);
+            }
+            Err(e) => {
+                eprintln!("[UmbraRelay] Failed to create RSS source '{}': {}", rss_source.name, e);
+            }
+        }
+    }
+    
+    // Sync GitHub repos
+    for repo in &config.github.repos {
+        let name = format!("{}/{}", repo.owner, repo.repo);
+        let key = get_source_key(&name, "github");
+        config_source_keys.insert(key.clone());
+        
+        if source_exists(&name, "github") {
+            // Source exists, ensure it's enabled (in case it was previously disabled)
+            if let Some(existing) = existing_sources.iter().find(|s| s.name == name && s.source_type == "github") {
+                if !existing.enabled {
+                    if let Err(e) = db.update_source(existing.id, None, None, Some(true)) {
+                        eprintln!("[UmbraRelay] Failed to re-enable GitHub source '{}': {}", name, e);
+                    } else {
+                        eprintln!("[UmbraRelay] Re-enabled GitHub source '{}'", name);
+                    }
+                }
+            }
+            continue;
+        }
+        
+        let config_json = json!({
+            "owner": repo.owner,
+            "repo": repo.repo,
+            "assigned_only": repo.assigned_only,
+            "_from_config": true  // Marker to track config-sourced items
+        });
+        
+        match db.create_source("github", &name, &config_json.to_string()) {
+            Ok(id) => {
+                eprintln!("[UmbraRelay] Created GitHub source '{}' (id: {})", name, id);
+                eprintln!("[UmbraRelay] Note: GitHub token must be added via UI for source {}", id);
+            }
+            Err(e) => {
+                eprintln!("[UmbraRelay] Failed to create GitHub source '{}': {}", name, e);
+            }
+        }
+    }
+    
+    // Disable sources that were in config but are no longer present
+    // Only disable sources that have the _from_config marker
+    for existing_source in &existing_sources {
+        let key = get_source_key(&existing_source.name, &existing_source.source_type);
+        
+        // Check if this source was from config (has _from_config marker)
+        let from_config = if let Ok(config_json) = serde_json::from_str::<serde_json::Value>(&existing_source.config_json) {
+            config_json.get("_from_config").and_then(|v| v.as_bool()).unwrap_or(false)
+        } else {
+            false
+        };
+        
+        // If source was from config but is no longer in config, disable it
+        if from_config && !config_source_keys.contains(&key) {
+            if existing_source.enabled {
+                if let Err(e) = db.update_source(existing_source.id, None, None, Some(false)) {
+                    eprintln!("[UmbraRelay] Failed to disable removed config source '{}': {}", existing_source.name, e);
+                } else {
+                    eprintln!("[UmbraRelay] Disabled source '{}' (removed from config)", existing_source.name);
+                }
+            }
+        }
+    }
+    
+    eprintln!("[UmbraRelay] Config sync complete");
 }
 
 // Helper function to get sources without holding guard across await

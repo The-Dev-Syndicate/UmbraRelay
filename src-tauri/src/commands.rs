@@ -147,62 +147,77 @@ pub async fn sync_source(
     db: State<'_, Mutex<Database>>,
     id: i64,
 ) -> Result<(), String> {
-    let db_guard = db.lock().map_err(|e| format!("Database lock error: {}", e))?;
-    let source = db_guard.get_source(id)
-        .map_err(|e| format!("Failed to get source: {}", e))?;
+    // Get source info and drop guard before await
+    let (source_type, config_json_str) = {
+        let db_guard = db.lock().map_err(|e| format!("Database lock error: {}", e))?;
+        let source = db_guard.get_source(id)
+            .map_err(|e| format!("Failed to get source: {}", e))?;
+        (source.source_type, source.config_json)
+    };
     
-    let config: serde_json::Value = serde_json::from_str(&source.config_json)
+    let config: serde_json::Value = serde_json::from_str(&config_json_str)
         .map_err(|e| format!("Failed to parse source config: {}", e))?;
     
-    drop(db_guard);
-    
-    // Create appropriate ingester
-    let items = match source.source_type.as_str() {
+    // Create appropriate ingester and poll (using spawn_blocking for blocking HTTP calls)
+    let items = match source_type.as_str() {
         "rss" => {
             let url = config.get("url")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| "Missing RSS URL in config".to_string())?;
             
-            let ingester = RssIngester::new(url.to_string())
-                .map_err(|e| format!("Failed to create RSS ingester: {}", e))?;
-            
-            ingester.poll()
-                .map_err(|e| format!("Failed to poll RSS feed: {}", e))?
+            let url = url.to_string();
+            tokio::task::spawn_blocking(move || {
+                let ingester = RssIngester::new(url)
+                    .map_err(|e| format!("Failed to create RSS ingester: {}", e))?;
+                ingester.poll()
+                    .map_err(|e| format!("Failed to poll RSS feed: {}", e))
+            })
+            .await
+            .map_err(|e| format!("Task join error: {}", e))?
         }
         "github" => {
-            let token_store: State<'_, Mutex<TokenStore>> = app.state();
-            let store = token_store.lock().map_err(|e| format!("Token store lock error: {}", e))?;
-            let token = store.get(&id)
-                .ok_or_else(|| "GitHub token not found".to_string())?
-                .clone();
-            drop(store);
+            // Get token before spawn_blocking to avoid holding guard across await
+            let token = {
+                let token_store: State<'_, Mutex<TokenStore>> = app.state();
+                let store = token_store.lock().map_err(|e| format!("Token store lock error: {}", e))?;
+                store.get(&id)
+                    .ok_or_else(|| "GitHub token not found".to_string())?
+                    .clone()
+            };
             
             let owner = config.get("owner")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| "Missing owner in GitHub config".to_string())?;
+                .ok_or_else(|| "Missing owner in GitHub config".to_string())?
+                .to_string();
             
             let repo = config.get("repo")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| "Missing repo in GitHub config".to_string())?;
+                .ok_or_else(|| "Missing repo in GitHub config".to_string())?
+                .to_string();
             
             let assigned_only = config.get("assigned_only")
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false);
             
-            let ingester = GitHubIngester::new(
-                owner.to_string(),
-                repo.to_string(),
-                token,
-                assigned_only,
-            ).map_err(|e| format!("Failed to create GitHub ingester: {}", e))?;
-            
-            ingester.poll()
-                .map_err(|e| format!("Failed to poll GitHub: {}", e))?
+            tokio::task::spawn_blocking(move || {
+                let ingester = GitHubIngester::new(
+                    owner,
+                    repo,
+                    token,
+                    assigned_only,
+                ).map_err(|e| format!("Failed to create GitHub ingester: {}", e))?;
+                
+                ingester.poll()
+                    .map_err(|e| format!("Failed to poll GitHub: {}", e))
+            })
+            .await
+            .map_err(|e| format!("Task join error: {}", e))?
         }
-        _ => return Err(format!("Unknown source type: {}", source.source_type)),
+        _ => return Err(format!("Unknown source type: {}", source_type)),
     };
     
     // Normalize and store items
+    let items = items?; // Unwrap the Result from spawn_blocking
     let db_guard = db.lock().map_err(|e| format!("Database lock error: {}", e))?;
     normalize_and_dedupe(&db_guard, id, items)
         .map_err(|e| format!("Failed to normalize items: {}", e))?;
@@ -216,24 +231,18 @@ pub async fn sync_source(
 
 #[tauri::command]
 pub async fn get_config(
-    app: AppHandle,
+    _app: AppHandle,
 ) -> Result<Config, String> {
-    let app_data_dir = app.path().app_data_dir()
-        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
-    
-    load_config(&app_data_dir)
+    load_config()
         .map_err(|e| format!("Failed to load config: {}", e))
 }
 
 #[tauri::command]
 pub async fn update_config(
-    app: AppHandle,
+    _app: AppHandle,
     config: Config,
 ) -> Result<(), String> {
-    let app_data_dir = app.path().app_data_dir()
-        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
-    
-    save_config(&app_data_dir, &config)
+    save_config(&config)
         .map_err(|e| format!("Failed to save config: {}", e))
 }
 

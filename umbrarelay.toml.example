@@ -1,5 +1,13 @@
 # UmbraRelay Configuration Example
-# Copy this file to your app data directory as umbrarelay.toml
+# 
+# Default location: ~/.config/umbrarelay/config.toml
+# 
+# To use a custom location, set the UMBRARELAY_CONFIG_PATH environment variable:
+#   export UMBRARELAY_CONFIG_PATH="$HOME/.config/umbrarelay/config.toml"
+#   # or
+#   export UMBRARELAY_CONFIG_PATH="/path/to/my/config.toml"
+# 
+# The path supports ~ expansion for your home directory.
 
 [github]
 poll_interval = "5m"

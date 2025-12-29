@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+use std::env;
 use anyhow::{Result, Context};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -60,29 +61,75 @@ impl Default for GitHubConfig {
     }
 }
 
-pub fn get_config_path(app_data_dir: &PathBuf) -> PathBuf {
-    app_data_dir.join("umbrarelay.toml")
+/// Get the config file path, checking UMBRARELAY_CONFIG_PATH env var first,
+/// then defaulting to ~/.config/umbrarelay/config.toml
+pub fn get_config_path() -> Result<PathBuf> {
+    // Check for environment variable override
+    if let Ok(env_path) = env::var("UMBRARELAY_CONFIG_PATH") {
+        // Expand ~ to home directory if present
+        let path_str = if env_path.starts_with("~") {
+            let home = if cfg!(windows) {
+                env::var("USERPROFILE")
+                    .or_else(|_| env::var("HOME"))
+                    .context("Failed to get home directory")?
+            } else {
+                env::var("HOME")
+                    .context("Failed to get home directory")?
+            };
+            
+            env_path.replacen("~", &home, 1)
+        } else {
+            env_path
+        };
+        
+        let path = PathBuf::from(&path_str);
+        return Ok(path);
+    }
+    
+    // Default: ~/.config/umbrarelay/config.toml
+    let home = if cfg!(windows) {
+        env::var("USERPROFILE")
+            .or_else(|_| env::var("HOME"))
+            .context("Failed to get home directory")?
+    } else {
+        env::var("HOME")
+            .context("Failed to get home directory")?
+    };
+    
+    Ok(PathBuf::from(home).join(".config").join("umbrarelay").join("config.toml"))
 }
 
-pub fn load_config(app_data_dir: &PathBuf) -> Result<Config> {
-    let config_path = get_config_path(app_data_dir);
+pub fn load_config() -> Result<Config> {
+    let config_path = get_config_path()?;
+    
+    // Debug logging
+    eprintln!("[UmbraRelay] Loading config from: {:?}", config_path);
+    eprintln!("[UmbraRelay] Config path exists: {}", config_path.exists());
+    
+    if let Ok(env_var) = env::var("UMBRARELAY_CONFIG_PATH") {
+        eprintln!("[UmbraRelay] UMBRARELAY_CONFIG_PATH env var: {}", env_var);
+    } else {
+        eprintln!("[UmbraRelay] UMBRARELAY_CONFIG_PATH env var not set");
+    }
     
     if !config_path.exists() {
+        eprintln!("[UmbraRelay] Config file does not exist, using default config");
         // Return default config if file doesn't exist
         return Ok(Config::default());
     }
 
     let content = fs::read_to_string(&config_path)
-        .context("Failed to read config file")?;
+        .context(format!("Failed to read config file at {:?}", config_path))?;
     
     let config: Config = toml::from_str(&content)
-        .context("Failed to parse config file")?;
+        .context(format!("Failed to parse config file at {:?}", config_path))?;
     
+    eprintln!("[UmbraRelay] Config loaded successfully");
     Ok(config)
 }
 
-pub fn save_config(app_data_dir: &PathBuf, config: &Config) -> Result<()> {
-    let config_path = get_config_path(app_data_dir);
+pub fn save_config(config: &Config) -> Result<()> {
+    let config_path = get_config_path()?;
     
     // Ensure directory exists
     if let Some(parent) = config_path.parent() {

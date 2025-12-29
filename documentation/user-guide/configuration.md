@@ -4,10 +4,27 @@ UmbraRelay can be configured via TOML file or UI. This guide covers both methods
 
 ## Config File Location
 
-The config file is located at:
-- **macOS**: `~/Library/Application Support/com.devsyndicate.umbra-relay/umbrarelay.toml`
-- **Windows**: `%APPDATA%\com.devsyndicate.umbra-relay\umbrarelay.toml`
-- **Linux**: `~/.config/com.devsyndicate.umbra-relay/umbrarelay.toml`
+By default, UmbraRelay stores its configuration at:
+- **All platforms**: `~/.config/umbrarelay/config.toml`
+
+The path supports `~` expansion for your home directory.
+
+### Custom Config Location
+
+You can override the config file location by setting the `UMBRARELAY_CONFIG_PATH` environment variable:
+
+```bash
+# Example: Use a custom location
+export UMBRARELAY_CONFIG_PATH="$HOME/.config/umbrarelay/config.toml"
+
+# Or use an absolute path
+export UMBRARELAY_CONFIG_PATH="/path/to/my/config.toml"
+
+# Supports ~ expansion
+export UMBRARELAY_CONFIG_PATH="~/.my-custom-config/umbrarelay.toml"
+```
+
+**Note**: The database will still be stored in the default app data directory, only the config file location is affected.
 
 ## TOML Syntax Basics
 
