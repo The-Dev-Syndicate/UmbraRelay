@@ -1,0 +1,21 @@
+# UmbraRelay Configuration Example
+# Copy this file to your app data directory as umbrarelay.toml
+
+[github]
+poll_interval = "5m"
+
+[[github.repos]]
+owner = "dev-syndicate"
+repo = "UmbraRelay"
+assigned_only = true
+
+[[rss]]
+name = "Hacker News"
+url = "https://news.ycombinator.com/rss"
+poll_interval = "10m"
+
+[[rss]]
+name = "Lobsters"
+url = "https://lobste.rs/rss"
+poll_interval = "15m"
+
