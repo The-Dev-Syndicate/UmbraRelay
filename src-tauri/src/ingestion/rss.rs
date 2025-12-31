@@ -61,6 +61,90 @@ impl RssIngester {
     }
 }
 
+// Extract image URL and content from a single item's XML
+fn extract_item_extras(item_xml: &str) -> (Option<String>, Option<String>) {
+    let mut image_url = None;
+    let mut content_html = None;
+    
+    // Try media:content first (Media RSS) - look for url attribute
+    let media_content_re = Regex::new(r#"<media:content[^>]*url=["']([^"']+)["']"#).ok();
+    if let Some(re) = media_content_re {
+        if let Some(captures) = re.captures(item_xml) {
+            if let Some(url) = captures.get(1) {
+                let url_str = url.as_str();
+                if url_str.starts_with("http://") || url_str.starts_with("https://") {
+                    image_url = Some(url_str.to_string());
+                }
+            }
+        }
+    }
+    
+    // Try enclosure with image type (standard RSS)
+    if image_url.is_none() {
+        let enclosure_re = Regex::new(r#"<enclosure[^>]*url=["']([^"']+)["'][^>]*type=["']([^"']+)["']"#).ok();
+        if let Some(re) = enclosure_re {
+            if let Some(captures) = re.captures(item_xml) {
+                if let Some(mime_type) = captures.get(2) {
+                    if mime_type.as_str().to_lowercase().starts_with("image/") {
+                        if let Some(url) = captures.get(1) {
+                            let url_str = url.as_str();
+                            if url_str.starts_with("http://") || url_str.starts_with("https://") {
+                                image_url = Some(url_str.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Try content:encoded (Content module) - handle both CDATA and regular content, multiline
+    // First try CDATA format: <content:encoded><![CDATA[...]]></content:encoded>
+    if let Some(cdata_start) = item_xml.find("<content:encoded><![") {
+        if let Some(cdata_content_start) = item_xml[cdata_start..].find("CDATA[") {
+            let actual_content_start = cdata_start + cdata_content_start + 6; // 6 = len("CDATA[")
+            if let Some(cdata_end) = item_xml[actual_content_start..].find("]]></content:encoded>") {
+                let content = item_xml[actual_content_start..actual_content_start + cdata_end].trim();
+                if !content.is_empty() {
+                    content_html = Some(content.to_string());
+                }
+            }
+        }
+    }
+    
+    // If no CDATA, try regular format: <content:encoded>...</content:encoded>
+    if content_html.is_none() {
+        if let Some(start) = item_xml.find("<content:encoded>") {
+            let content_start = start + 17; // length of "<content:encoded>"
+            if let Some(end) = item_xml[content_start..].find("</content:encoded>") {
+                let content = item_xml[content_start..content_start + end].trim();
+                if !content.is_empty() {
+                    content_html = Some(content.to_string());
+                }
+            }
+        }
+    }
+    
+    // Fallback: check if description contains HTML
+    if content_html.is_none() {
+        let desc_re = Regex::new(r#"<description><!\[CDATA\[(.*?)\]\]></description>"#).ok()
+            .or_else(|| Regex::new(r#"<description>(.*?)</description>"#).ok());
+        if let Some(re) = desc_re {
+            if let Some(captures) = re.captures(item_xml) {
+                if let Some(desc) = captures.get(1) {
+                    let desc_str = desc.as_str().trim();
+                    // Check if it contains HTML tags
+                    if desc_str.contains('<') && desc_str.contains('>') && desc_str.len() > 50 {
+                        content_html = Some(desc_str.to_string());
+                    }
+                }
+            }
+        }
+    }
+    
+    (image_url, content_html)
+}
+
 impl IngestSource for RssIngester {
     fn poll(&self) -> Result<Vec<IngestedItem>> {
         let response = self.client
@@ -74,9 +158,30 @@ impl IngestSource for RssIngester {
         let channel = Channel::read_from(content.as_bytes())
             .context("Failed to parse RSS feed")?;
         
+        // Parse items with enhanced extraction
+        // Extract all item blocks from XML first
+        let item_blocks: Vec<String> = {
+            let mut blocks = Vec::new();
+            let mut start = 0;
+            while let Some(item_start) = content[start..].find("<item") {
+                let actual_start = start + item_start;
+                // Find the end of this item
+                if let Some(item_end) = content[actual_start..].find("</item>") {
+                    let block = content[actual_start..actual_start + item_end + 7].to_string();
+                    blocks.push(block);
+                    start = actual_start + item_end + 7;
+                } else {
+                    break;
+                }
+            }
+            blocks
+        };
+        
+        // Match parsed items with their XML blocks
         let items: Vec<IngestedItem> = channel.items()
             .iter()
-            .map(|item| {
+            .enumerate()
+            .map(|(idx, item)| {
                 let external_id = item.guid()
                     .map(|g| g.value().to_string())
                     .unwrap_or_else(|| {
@@ -100,6 +205,39 @@ impl IngestSource for RssIngester {
                             .map(|dt| dt.timestamp())
                     });
                 
+                // Get the corresponding XML block by matching link or title
+                // Use index as primary method since items should be in same order
+                let item_xml = if idx < item_blocks.len() {
+                    item_blocks[idx].clone()
+                } else if let Some(link) = item.link() {
+                    // Fallback: try to find by link
+                    item_blocks.iter()
+                        .find(|block| {
+                            // Check for link tag containing this URL (try various formats)
+                            block.contains(link) || 
+                            block.contains(&format!("<link>{}</link>", link)) ||
+                            block.contains(&format!(">{}</link>", link)) ||
+                            block.contains(&format!("<link>{}</link>", link.replace("https://", "").replace("http://", "")))
+                        })
+                        .cloned()
+                        .unwrap_or_default()
+                } else if let Some(title) = item.title() {
+                    // Fallback: try to match by title
+                    item_blocks.iter()
+                        .find(|block| block.contains(title))
+                        .cloned()
+                        .unwrap_or_default()
+                } else {
+                    String::new()
+                };
+                
+                // Extract image and content from this item's XML
+                let (image_url, content_html) = if !item_xml.is_empty() {
+                    extract_item_extras(&item_xml)
+                } else {
+                    (None, None)
+                };
+                
                 IngestedItem {
                     external_id,
                     title,
@@ -107,6 +245,8 @@ impl IngestSource for RssIngester {
                     url,
                     item_type: "post".to_string(),
                     occurred_at,
+                    image_url,
+                    content_html,
                 }
             })
             .collect();

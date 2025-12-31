@@ -114,6 +114,8 @@ impl IngestSource for GitHubIngester {
                     url: issue.html_url,
                     item_type: item_type.to_string(),
                     occurred_at,
+                    image_url: None,
+                    content_html: None,
                 }
             })
             .collect();

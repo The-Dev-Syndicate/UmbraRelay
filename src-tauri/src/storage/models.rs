@@ -27,6 +27,14 @@ pub struct Item {
     pub state: String,
     pub created_at: i64,
     pub updated_at: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content_html: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_group: Option<String>,
 }
 
 impl Source {
@@ -58,6 +66,29 @@ impl Item {
             state: row.get(7)?,
             created_at: row.get(8)?,
             updated_at: row.get(9)?,
+            image_url: row.get(10).ok(),
+            content_html: row.get(11).ok(),
+            source_name: None,
+            source_group: None,
+        })
+    }
+    
+    pub fn from_row_with_source(row: &Row) -> rusqlite::Result<Item> {
+        Ok(Item {
+            id: row.get(0)?,
+            source_id: row.get(1)?,
+            external_id: row.get(2)?,
+            title: row.get(3)?,
+            summary: row.get(4)?,
+            url: row.get(5)?,
+            item_type: row.get(6)?,
+            state: row.get(7)?,
+            created_at: row.get(8)?,
+            updated_at: row.get(9)?,
+            image_url: row.get(10).ok(),
+            content_html: row.get(11).ok(),
+            source_name: row.get(12).ok(),
+            source_group: row.get(13).ok(),
         })
     }
 }

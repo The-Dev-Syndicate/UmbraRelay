@@ -3,8 +3,14 @@
     <div v-if="loading" class="loading">Loading...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <div v-else-if="item" class="item-content">
-      <div class="header">
-        <button @click="$emit('back')" class="back-button">← Back</button>
+      <div class="header sticky-header">
+        <div class="header-left">
+          <button @click="$emit('back')" class="back-button">← Back</button>
+          <div class="item-meta-inline">
+            <span class="item-type">{{ item.item_type }}</span>
+            <span class="item-state">{{ item.state }}</span>
+          </div>
+        </div>
         <div class="actions">
           <button
             v-if="item.state === 'unread'"
@@ -37,27 +43,50 @@
       </div>
 
       <div class="item-meta">
-        <span class="item-type">{{ item.item_type }}</span>
-        <span class="item-state">{{ item.state }}</span>
         <span class="item-date">{{ formatDate(item.created_at) }}</span>
       </div>
 
       <h1 class="item-title">{{ item.title }}</h1>
 
-      <div v-if="hasValidSummary" class="item-summary">{{ cleanedSummary }}</div>
-      <div v-else-if="item.summary" class="item-summary-raw">
-        <p><em>Summary content filtered (may contain only links or minimal text)</em></p>
-        <details>
-          <summary style="cursor: pointer; color: #666; font-size: 14px;">Show raw content</summary>
-          <pre style="margin-top: 8px; padding: 12px; background: #f5f5f5; border-radius: 4px; font-size: 12px; overflow-x: auto;">{{ item.summary }}</pre>
-        </details>
+      <div v-if="item.image_url" class="item-image-container">
+        <img :src="item.image_url" :alt="item.title" class="item-image" />
       </div>
-      <div v-else class="item-no-content">
-        <p><strong>No summary available in RSS feed</strong></p>
-        <p style="margin-top: 8px; font-size: 14px; color: #666;">
-          Many RSS feeds only provide titles and links. Click "Open Link" above to view the full article content on the original website.
+
+      <!-- Show description as muted preview text if we have full content -->
+      <div v-if="item.content_html && hasValidSummary" class="item-description-preview">
+        {{ cleanedSummary }}
+      </div>
+
+      <!-- Show full HTML content if available - this should render as HTML, not text -->
+      <div v-if="hasContentHtml" class="item-content-html-wrapper">
+        <div class="item-content-html" v-html="decodedContentHtml"></div>
+      </div>
+      
+      <!-- Debug: Show if content_html is expected but missing -->
+      <div v-else-if="item.image_url" class="item-content-missing">
+        <p><em>Full article content not available. This item may need to be re-synced to load the full content.</em></p>
+        <p style="margin-top: 8px; font-size: 12px; color: #999;">
+          If this feed supports full content (like Fox News), try syncing the source again.
         </p>
       </div>
+      
+      <!-- Fallback to summary if no content_html (show as plain text, not HTML) -->
+      <template v-else>
+        <div v-if="hasValidSummary" class="item-summary">{{ cleanedSummary }}</div>
+        <div v-else-if="item.summary" class="item-summary-raw">
+          <p><em>Summary content filtered (may contain only links or minimal text)</em></p>
+          <details>
+            <summary style="cursor: pointer; color: #666; font-size: 14px;">Show raw content</summary>
+            <pre style="margin-top: 8px; padding: 12px; background: #f5f5f5; border-radius: 4px; font-size: 12px; overflow-x: auto;">{{ item.summary }}</pre>
+          </details>
+        </div>
+        <div v-else class="item-no-content">
+          <p><strong>No summary available in RSS feed</strong></p>
+          <p style="margin-top: 8px; font-size: 14px; color: #666;">
+            Many RSS feeds only provide titles and links. Click "Open Link" above to view the full article content on the original website.
+          </p>
+        </div>
+      </template>
 
       <div class="item-url">
         <a :href="item.url" target="_blank" rel="noopener noreferrer">
@@ -91,6 +120,12 @@ const fetchItem = async () => {
   error.value = null;
   try {
     item.value = await invoke<Item>('get_item', { id: props.itemId });
+    // Debug: log content_html
+    if (item.value) {
+      console.log('Item content_html exists:', !!item.value.content_html);
+      console.log('Item content_html length:', item.value.content_html?.length || 0);
+      console.log('Item content_html preview:', item.value.content_html?.substring(0, 200) || 'N/A');
+    }
   } catch (e) {
     error.value = e as string;
     console.error('Failed to fetch item:', e);
@@ -151,6 +186,24 @@ const hasValidSummary = computed(() => {
   return cleanedSummary.value.length > 0;
 });
 
+const hasContentHtml = computed(() => {
+  return !!(item.value?.content_html && item.value.content_html.trim().length > 0);
+});
+
+// Decode HTML entities (fixes double-encoding issue)
+// The RSS feed may have HTML entities like &lt; &gt; &quot; etc. that need to be decoded
+// We decode entities but preserve the HTML structure
+const decodedContentHtml = computed(() => {
+  if (!item.value?.content_html) return '';
+  
+  // Use a textarea element to decode HTML entities
+  // This is the standard way to decode HTML entities in the browser
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = item.value.content_html;
+  return textarea.value;
+});
+
+
 onMounted(() => {
   fetchItem();
 });
@@ -158,9 +211,13 @@ onMounted(() => {
 
 <style scoped>
 .item-detail {
-  padding: 20px;
+  padding: 0;
   max-width: 800px;
   margin: 0 auto;
+}
+
+.item-content {
+  padding: 20px;
 }
 
 .loading, .error {
@@ -177,6 +234,41 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+}
+
+.sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: white;
+  padding: 12px 20px;
+  margin: -20px -20px 20px -20px;
+  border-bottom: 1px solid #e0e0e0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.item-meta-inline {
+  display: flex;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.item-meta-inline .item-type,
+.item-meta-inline .item-state {
+  text-transform: uppercase;
+  font-weight: bold;
+}
+
+.item-meta-inline .item-state {
+  color: #396cd8;
 }
 
 .back-button {
@@ -263,6 +355,218 @@ onMounted(() => {
 
 .item-url a:hover {
   text-decoration: underline;
+}
+
+.item-image-container {
+  margin-bottom: 24px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f0f0f0;
+}
+
+.item-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  max-height: 500px;
+  object-fit: contain;
+}
+
+.item-content-html-wrapper {
+  margin-bottom: 24px;
+}
+
+.item-content-html {
+  line-height: 1.8;
+  color: #1a1a1a;
+  font-size: 16px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.item-content-html :deep(p) {
+  margin-bottom: 20px;
+  margin-top: 0;
+  line-height: 1.8;
+  color: #1a1a1a;
+}
+
+.item-content-html :deep(p:first-child) {
+  margin-top: 0;
+}
+
+.item-content-html :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.item-content-html :deep(a) {
+  color: #396cd8;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s ease;
+}
+
+.item-content-html :deep(a:hover) {
+  border-bottom-color: #396cd8;
+  text-decoration: none;
+}
+
+.item-content-html :deep(a strong),
+.item-content-html :deep(strong a) {
+  font-weight: 700;
+  color: #2952b8;
+}
+
+.item-content-html :deep(img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 24px 0;
+  display: block;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.item-content-html :deep(h1),
+.item-content-html :deep(h2),
+.item-content-html :deep(h3),
+.item-content-html :deep(h4),
+.item-content-html :deep(h5),
+.item-content-html :deep(h6) {
+  margin-top: 32px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #1a1a1a;
+}
+
+.item-content-html :deep(h1) {
+  font-size: 28px;
+  margin-top: 0;
+}
+
+.item-content-html :deep(h2) {
+  font-size: 24px;
+}
+
+.item-content-html :deep(h3) {
+  font-size: 20px;
+}
+
+.item-content-html :deep(h4) {
+  font-size: 18px;
+}
+
+.item-content-html :deep(ul),
+.item-content-html :deep(ol) {
+  margin-left: 24px;
+  margin-bottom: 20px;
+  padding-left: 8px;
+}
+
+.item-content-html :deep(li) {
+  margin-bottom: 8px;
+  line-height: 1.8;
+}
+
+.item-content-html :deep(blockquote) {
+  border-left: 4px solid #396cd8;
+  padding: 16px 20px;
+  margin: 24px 0;
+  background: #f8f9fa;
+  border-radius: 4px;
+  color: #555;
+  font-style: italic;
+  line-height: 1.7;
+}
+
+.item-content-html :deep(blockquote p) {
+  margin-bottom: 12px;
+}
+
+.item-content-html :deep(blockquote p:last-child) {
+  margin-bottom: 0;
+}
+
+.item-content-html :deep(strong),
+.item-content-html :deep(b) {
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.item-content-html :deep(em),
+.item-content-html :deep(i) {
+  font-style: italic;
+}
+
+.item-content-html :deep(code) {
+  background: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 14px;
+  color: #d32f2f;
+}
+
+.item-content-html :deep(pre) {
+  background: #f5f5f5;
+  padding: 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 20px 0;
+  line-height: 1.6;
+}
+
+.item-content-html :deep(pre code) {
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+
+.item-content-html :deep(hr) {
+  border: none;
+  border-top: 1px solid #e0e0e0;
+  margin: 32px 0;
+}
+
+.item-content-html :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+}
+
+.item-content-html :deep(table th),
+.item-content-html :deep(table td) {
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  text-align: left;
+}
+
+.item-content-html :deep(table th) {
+  background: #f8f9fa;
+  font-weight: 600;
+}
+
+.item-description-preview {
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border-left: 3px solid #396cd8;
+  border-radius: 4px;
+  color: #666;
+  font-size: 14px;
+  line-height: 1.5;
+  font-style: italic;
+}
+
+.item-content-missing {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 4px;
+  color: #856404;
+  font-size: 14px;
 }
 </style>
 

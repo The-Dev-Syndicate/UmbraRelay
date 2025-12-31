@@ -85,19 +85,38 @@
           <input v-model="rssForm.pollInterval" type="text" placeholder="10m" />
         </div>
         <div class="form-group">
-          <label>Group (optional) - Create or select a group to organize your feeds</label>
-          <input 
-            v-model="rssForm.group" 
-            type="text" 
-            placeholder="e.g., News, Tech, Work, Personal..." 
-            list="groups-list-rss"
-            autocomplete="off"
-          />
-          <datalist id="groups-list-rss">
-            <option v-for="group in availableGroups" :key="group" :value="group" />
-          </datalist>
+          <label>Groups (optional) - Type groups separated by commas</label>
+          <div class="group-input-container">
+            <div class="group-pills">
+              <span 
+                v-for="(group, index) in parseGroups(rssForm.group)" 
+                :key="index" 
+                class="group-pill"
+              >
+                {{ group }}
+                <button 
+                  type="button"
+                  @click="removeGroup('rss', index)"
+                  class="pill-remove"
+                >×</button>
+              </span>
+            </div>
+            <input 
+              v-model="rssForm.groupInput" 
+              type="text" 
+              placeholder="Type group name, press comma..." 
+              class="group-input"
+              @keydown="handleGroupKeydown($event, 'rss')"
+              @blur="handleGroupBlur('rss')"
+              list="groups-list-rss"
+              autocomplete="off"
+            />
+            <datalist id="groups-list-rss">
+              <option v-for="group in availableGroups" :key="group" :value="group" />
+            </datalist>
+          </div>
           <small style="color: #666; font-size: 12px; margin-top: 4px; display: block;">
-            Type a new group name or select from existing groups above
+            Type a group name and press comma to add it as a tag
           </small>
         </div>
         <button type="submit" class="submit-button">Add RSS Feed</button>
@@ -127,19 +146,38 @@
           </label>
         </div>
         <div class="form-group">
-          <label>Group (optional) - Create or select a group to organize your feeds</label>
-          <input 
-            v-model="githubForm.group" 
-            type="text" 
-            placeholder="e.g., Work, Personal, Projects..." 
-            list="groups-list-github"
-            autocomplete="off"
-          />
-          <datalist id="groups-list-github">
-            <option v-for="group in availableGroups" :key="group" :value="group" />
-          </datalist>
+          <label>Groups (optional) - Type groups separated by commas</label>
+          <div class="group-input-container">
+            <div class="group-pills">
+              <span 
+                v-for="(group, index) in parseGroups(githubForm.group)" 
+                :key="index" 
+                class="group-pill"
+              >
+                {{ group }}
+                <button 
+                  type="button"
+                  @click="removeGroup('github', index)"
+                  class="pill-remove"
+                >×</button>
+              </span>
+            </div>
+            <input 
+              v-model="githubForm.groupInput" 
+              type="text" 
+              placeholder="Type group name, press comma..." 
+              class="group-input"
+              @keydown="handleGroupKeydown($event, 'github')"
+              @blur="handleGroupBlur('github')"
+              list="groups-list-github"
+              autocomplete="off"
+            />
+            <datalist id="groups-list-github">
+              <option v-for="group in availableGroups" :key="group" :value="group" />
+            </datalist>
+          </div>
           <small style="color: #666; font-size: 12px; margin-top: 4px; display: block;">
-            Type a new group name or select from existing groups above
+            Type a group name and press comma to add it as a tag
           </small>
         </div>
         <button type="submit" class="submit-button">Add GitHub Source</button>
@@ -170,17 +208,36 @@
               <input v-model="editForm.pollInterval" type="text" placeholder="10m" />
             </div>
             <div class="form-group">
-              <label>Group (optional)</label>
-              <input 
-                v-model="editForm.group" 
-                type="text" 
-                placeholder="e.g., News, Tech, etc." 
-                list="edit-groups-list-rss"
-                autocomplete="off"
-              />
-              <datalist id="edit-groups-list-rss">
-                <option v-for="group in availableGroups" :key="group" :value="group" />
-              </datalist>
+              <label>Groups (optional) - Type groups separated by commas</label>
+              <div class="group-input-container">
+                <div class="group-pills">
+                  <span 
+                    v-for="(group, index) in parseGroups(editForm.group)" 
+                    :key="index" 
+                    class="group-pill"
+                  >
+                    {{ group }}
+                    <button 
+                      type="button"
+                      @click="removeGroup('edit', index)"
+                      class="pill-remove"
+                    >×</button>
+                  </span>
+                </div>
+                <input 
+                  v-model="editForm.groupInput" 
+                  type="text" 
+                  placeholder="Type group name, press comma..." 
+                  class="group-input"
+                  @keydown="handleGroupKeydown($event, 'edit')"
+                  @blur="handleGroupBlur('edit')"
+                  list="edit-groups-list-rss"
+                  autocomplete="off"
+                />
+                <datalist id="edit-groups-list-rss">
+                  <option v-for="group in availableGroups" :key="group" :value="group" />
+                </datalist>
+              </div>
             </div>
             <div class="form-group">
               <label>
@@ -219,17 +276,36 @@
               </label>
             </div>
             <div class="form-group">
-              <label>Group (optional)</label>
-              <input 
-                v-model="editForm.group" 
-                type="text" 
-                placeholder="e.g., Work, Personal, etc." 
-                list="edit-groups-list-github"
-                autocomplete="off"
-              />
-              <datalist id="edit-groups-list-github">
-                <option v-for="group in availableGroups" :key="group" :value="group" />
-              </datalist>
+              <label>Groups (optional) - Type groups separated by commas</label>
+              <div class="group-input-container">
+                <div class="group-pills">
+                  <span 
+                    v-for="(group, index) in parseGroups(editForm.group)" 
+                    :key="index" 
+                    class="group-pill"
+                  >
+                    {{ group }}
+                    <button 
+                      type="button"
+                      @click="removeGroup('edit', index)"
+                      class="pill-remove"
+                    >×</button>
+                  </span>
+                </div>
+                <input 
+                  v-model="editForm.groupInput" 
+                  type="text" 
+                  placeholder="Type group name, press comma..." 
+                  class="group-input"
+                  @keydown="handleGroupKeydown($event, 'edit')"
+                  @blur="handleGroupBlur('edit')"
+                  list="edit-groups-list-github"
+                  autocomplete="off"
+                />
+                <datalist id="edit-groups-list-github">
+                  <option v-for="group in availableGroups" :key="group" :value="group" />
+                </datalist>
+              </div>
             </div>
             <div class="form-group">
               <label>
@@ -262,12 +338,13 @@ const editingSource = ref<Source | null>(null);
 
 const newSourceType = ref<'rss' | 'github'>('rss');
 
-// Get available groups from existing sources
+// Get available groups from existing sources (parse comma-separated)
 const availableGroups = computed(() => {
   const groups = new Set<string>();
   sources.value.forEach(source => {
     if (source.group) {
-      groups.add(source.group);
+      const parsed = source.group.split(',').map(g => g.trim()).filter(g => g.length > 0);
+      parsed.forEach(g => groups.add(g));
     }
   });
   return Array.from(groups).sort();
@@ -278,6 +355,7 @@ const rssForm = ref({
   url: '',
   pollInterval: '10m',
   group: '',
+  groupInput: '',
 });
 
 const githubForm = ref({
@@ -287,6 +365,7 @@ const githubForm = ref({
   token: '',
   assignedOnly: false,
   group: '',
+  groupInput: '',
 });
 
 // Edit form - will be populated when editing
@@ -299,6 +378,7 @@ const editForm = ref({
   token: '',
   assignedOnly: false,
   group: '',
+  groupInput: '',
   enabled: true,
 });
 
@@ -316,7 +396,7 @@ const addRssSource = async () => {
   await addSource(source);
   
   // Reset form
-  rssForm.value = { name: '', url: '', pollInterval: '10m', group: '' };
+  rssForm.value = { name: '', url: '', pollInterval: '10m', group: '', groupInput: '' };
 };
 
 const addGitHubSource = async () => {
@@ -335,7 +415,7 @@ const addGitHubSource = async () => {
   await addSource(source);
   
   // Reset form
-  githubForm.value = { name: '', owner: '', repo: '', token: '', assignedOnly: false, group: '' };
+  githubForm.value = { name: '', owner: '', repo: '', token: '', assignedOnly: false, group: '', groupInput: '' };
 };
 
 const toggleSource = async (id: number, enabled: boolean) => {
@@ -363,6 +443,7 @@ const editSource = (source: Source) => {
   editForm.value.name = source.name;
   editForm.value.enabled = source.enabled;
   editForm.value.group = source.group || '';
+  editForm.value.groupInput = '';
   
   if (source.source_type === 'rss') {
     editForm.value.url = config.url || '';
@@ -390,8 +471,131 @@ const closeEditPanel = () => {
     token: '',
     assignedOnly: false,
     group: '',
+    groupInput: '',
     enabled: true,
   };
+};
+
+// Parse comma-separated groups
+const parseGroups = (groupString: string | null | undefined): string[] => {
+  if (!groupString) return [];
+  return groupString.split(',').map(g => g.trim()).filter(g => g.length > 0);
+};
+
+// Handle group input keydown
+const handleGroupKeydown = (event: KeyboardEvent, formType: 'rss' | 'github' | 'edit') => {
+  if (event.key === ',' || event.key === 'Enter') {
+    event.preventDefault();
+    addGroupFromInput(formType);
+  } else if (event.key === 'Backspace') {
+    const form = formType === 'rss' ? rssForm.value : formType === 'github' ? githubForm.value : editForm.value;
+    if (form.groupInput === '' && form.group) {
+      // Remove last group if input is empty
+      const groups = parseGroups(form.group);
+      if (groups.length > 0) {
+        groups.pop();
+        form.group = groups.join(', ');
+        if (formType === 'rss') {
+          rssForm.value = { ...rssForm.value, group: form.group };
+        } else if (formType === 'github') {
+          githubForm.value = { ...githubForm.value, group: form.group };
+        } else {
+          editForm.value = { ...editForm.value, group: form.group };
+        }
+      }
+    }
+  }
+};
+
+// Handle group input blur
+const handleGroupBlur = (formType: 'rss' | 'github' | 'edit') => {
+  const form = formType === 'rss' ? rssForm.value : formType === 'github' ? githubForm.value : editForm.value;
+  if (form.groupInput.trim()) {
+    addGroupFromInput(formType);
+  }
+};
+
+// Add group from input
+const addGroupFromInput = async (formType: 'rss' | 'github' | 'edit') => {
+  const form = formType === 'rss' ? rssForm.value : formType === 'github' ? githubForm.value : editForm.value;
+  const input = form.groupInput.trim();
+  if (input) {
+    const groups = parseGroups(form.group);
+    if (!groups.includes(input)) {
+      groups.push(input);
+      const newGroupString = groups.join(', ');
+      form.group = newGroupString;
+      form.groupInput = '';
+      
+      if (formType === 'rss') {
+        rssForm.value = { ...rssForm.value, group: newGroupString, groupInput: '' };
+      } else if (formType === 'github') {
+        githubForm.value = { ...githubForm.value, group: newGroupString, groupInput: '' };
+      } else {
+        // In edit mode, immediately save to database
+        editForm.value = { ...editForm.value, group: newGroupString, groupInput: '' };
+        if (editingSource.value) {
+          try {
+            await updateSource(editingSource.value.id, { 
+              group: newGroupString || null 
+            });
+            // Refresh sources to update available groups
+            await fetchSources();
+          } catch (e) {
+            console.error('Failed to update source groups:', e);
+            // Revert on error
+            const groups = parseGroups(editingSource.value.group || '');
+            groups.pop(); // Remove the group we just added
+            editForm.value.group = groups.join(', ');
+          }
+        }
+      }
+    } else {
+      form.groupInput = '';
+    }
+  }
+};
+
+// Remove group by index
+const removeGroup = async (formType: 'rss' | 'github' | 'edit', index: number) => {
+  const form = formType === 'rss' ? rssForm.value : formType === 'github' ? githubForm.value : editForm.value;
+  const groups = parseGroups(form.group);
+  if (index < 0 || index >= groups.length) return; // Safety check
+  groups.splice(index, 1);
+  const newGroupString = groups.length > 0 ? groups.join(', ') : '';
+  form.group = newGroupString;
+  
+  if (formType === 'rss') {
+    rssForm.value = { ...rssForm.value, group: newGroupString };
+  } else if (formType === 'github') {
+    githubForm.value = { ...githubForm.value, group: newGroupString };
+  } else {
+    // In edit mode, immediately save to database
+    editForm.value = { ...editForm.value, group: newGroupString };
+    if (editingSource.value) {
+      try {
+        // Pass empty string to clear groups (backend will treat empty string as NULL)
+        // We need to pass an empty string, not null, because JSON null deserializes to None (don't update)
+        // but we want to update to NULL, so we pass "" and let backend handle it
+        const groupValue = newGroupString.trim() === '' ? '' : newGroupString;
+        await updateSource(editingSource.value.id, { 
+          group: groupValue
+        });
+        // Refresh sources to update available groups and update editingSource
+        await fetchSources();
+        // Update editingSource to reflect the change
+        const updatedSource = sources.value.find(s => s.id === editingSource.value!.id);
+        if (updatedSource) {
+          editingSource.value = updatedSource;
+          editForm.value.group = updatedSource.group || '';
+        }
+      } catch (e) {
+        console.error('Failed to update source groups:', e);
+        // Revert on error
+        editForm.value.group = editingSource.value.group || '';
+      }
+    }
+  }
 };
 
 const saveEdit = async () => {
@@ -709,6 +913,73 @@ onMounted(() => {
 
 .form-group input[type="checkbox"] {
   margin-right: 8px;
+}
+
+.group-input-container {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  min-height: 40px;
+  background: white;
+}
+
+.group-input-container:focus-within {
+  border-color: #396cd8;
+  outline: none;
+}
+
+.group-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.group-pill {
+  background: #e3f2fd;
+  color: #1976d2;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pill-remove {
+  background: none;
+  border: none;
+  color: #1976d2;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background 0.2s;
+}
+
+.pill-remove:hover {
+  background: rgba(25, 118, 210, 0.2);
+}
+
+.group-input {
+  flex: 1;
+  min-width: 120px;
+  border: none;
+  outline: none;
+  padding: 4px 8px;
+  font-size: 14px;
+  background: transparent;
 }
 
 .submit-button {

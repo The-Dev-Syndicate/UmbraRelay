@@ -9,6 +9,8 @@ pub struct IngestedItem {
     pub url: String,
     pub item_type: String,
     pub occurred_at: Option<i64>,
+    pub image_url: Option<String>,
+    pub content_html: Option<String>,
 }
 
 pub trait IngestSource: Send + Sync {

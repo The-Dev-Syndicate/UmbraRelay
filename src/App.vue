@@ -37,6 +37,7 @@
         <p>Select a view from the sidebar</p>
       </div>
     </main>
+    <LinkHoverPreview />
   </div>
 </template>
 
@@ -45,6 +46,7 @@ import { ref, onMounted } from 'vue';
 import InboxView from './components/InboxView.vue';
 import ItemDetail from './components/ItemDetail.vue';
 import SourceConfig from './components/SourceConfig.vue';
+import LinkHoverPreview from './components/LinkHoverPreview.vue';
 
 const currentView = ref<'inbox' | 'sources'>('inbox');
 const selectedItemId = ref<number | null>(null);

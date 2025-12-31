@@ -17,6 +17,8 @@ pub fn normalize_and_dedupe(
             item.summary.as_deref(),
             &item.url,
             &item.item_type,
+            item.image_url.as_deref(),
+            item.content_html.as_deref(),
         )?;
         
         item_ids.push(item_id);

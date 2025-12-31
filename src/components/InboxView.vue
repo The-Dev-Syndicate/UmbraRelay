@@ -37,16 +37,35 @@
         :class="item.state"
         @click="selectItem(item.id)"
       >
-        <div class="item-header">
+        <div class="item-card-header">
+          <span class="item-source-name">{{ item.source_name || 'Unknown Source' }}</span>
           <div class="item-badges">
             <span class="item-type-badge">{{ item.item_type.toUpperCase() }}</span>
             <span class="item-state-badge" :class="item.state">{{ item.state.toUpperCase() }}</span>
           </div>
         </div>
-        <h3 class="item-title">{{ item.title }}</h3>
-        <p v-if="item.summary && stripHtml(item.summary).trim() && stripHtml(item.summary).toLowerCase() !== 'comments'" class="item-summary">{{ truncate(stripHtml(item.summary), 200) }}</p>
+        <div class="item-content">
+          <div class="item-content-wrapper">
+            <div v-if="item.image_url" class="item-image-container">
+              <img :src="item.image_url" :alt="item.title" class="item-image" />
+            </div>
+            <div class="item-text-content">
+              <h3 class="item-title">{{ item.title }}</h3>
+              <p v-if="item.summary && stripHtml(item.summary).trim() && stripHtml(item.summary).toLowerCase() !== 'comments'" class="item-summary">{{ truncate(stripHtml(item.summary), 200) }}</p>
+            </div>
+          </div>
+        </div>
         <div class="item-footer">
           <span class="item-date">{{ formatDate(item.created_at) }}</span>
+          <div v-if="item.source_group" class="item-groups">
+            <span 
+              v-for="group in parseGroups(item.source_group)" 
+              :key="group" 
+              class="group-tag"
+            >
+              {{ group }}
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -69,12 +88,13 @@ const currentGroupFilter = ref<string>('');
 
 const filters = ['All', 'Unread', 'Read', 'Archived'];
 
-// Get available groups from sources
+// Get available groups from sources (parse comma-separated)
 const availableGroups = computed(() => {
   const groups = new Set<string>();
   sources.value.forEach(source => {
     if (source.group) {
-      groups.add(source.group);
+      const parsed = source.group.split(',').map(g => g.trim()).filter(g => g.length > 0);
+      parsed.forEach(g => groups.add(g));
     }
   });
   return Array.from(groups).sort();
@@ -114,6 +134,11 @@ const stripHtml = (html: string) => {
 const formatDate = (timestamp: number) => {
   const date = new Date(timestamp * 1000);
   return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+};
+
+const parseGroups = (groupString: string | null | undefined): string[] => {
+  if (!groupString) return [];
+  return groupString.split(',').map(g => g.trim()).filter(g => g.length > 0);
 };
 
 onMounted(() => {
@@ -229,11 +254,52 @@ onMounted(() => {
   opacity: 0.6;
 }
 
-.item-header {
+.item-card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.item-source-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.item-content {
+  flex: 1;
+}
+
+.item-content-wrapper {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.item-image-container {
+  flex-shrink: 0;
+  width: 120px;
+  height: 80px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #f0f0f0;
+}
+
+.item-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.item-text-content {
+  flex: 1;
+  min-width: 0;
 }
 
 .item-badges {
@@ -301,6 +367,21 @@ onMounted(() => {
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid #f0f0f0;
+}
+
+.item-groups {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.group-tag {
+  background: #e3f2fd;
+  color: #1976d2;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
 }
 </style>
 
