@@ -14,7 +14,7 @@
           <div>
             <h3>{{ source.name }}</h3>
             <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px;">
-              <span class="source-type">{{ source.type }}</span>
+              <span class="source-type">{{ source.source_type }}</span>
               <span v-if="source.group" class="source-group">{{ source.group }}</span>
             </div>
           </div>
@@ -145,6 +145,106 @@
         <button type="submit" class="submit-button">Add GitHub Source</button>
       </form>
     </div>
+
+    <!-- Slide-in Edit Panel -->
+    <div v-if="editingSource" class="edit-panel-overlay" @click="closeEditPanel">
+      <div class="edit-panel" @click.stop>
+        <div class="edit-panel-header">
+          <h2>Editing: {{ editingSource.name }}</h2>
+          <button @click="closeEditPanel" class="close-button" title="Close">×</button>
+        </div>
+        
+        <div class="edit-panel-content">
+          <!-- RSS Edit Form -->
+          <form v-if="editingSource && editingSource.source_type === 'rss'" @submit.prevent="saveEdit" class="source-form">
+            <div class="form-group">
+              <label>Name</label>
+              <input v-model="editForm.name" type="text" required placeholder="e.g., Hacker News" />
+            </div>
+            <div class="form-group">
+              <label>URL</label>
+              <input v-model="editForm.url" type="url" required placeholder="https://example.com/feed.xml" />
+            </div>
+            <div class="form-group">
+              <label>Poll Interval (optional)</label>
+              <input v-model="editForm.pollInterval" type="text" placeholder="10m" />
+            </div>
+            <div class="form-group">
+              <label>Group (optional)</label>
+              <input 
+                v-model="editForm.group" 
+                type="text" 
+                placeholder="e.g., News, Tech, etc." 
+                list="edit-groups-list-rss"
+                autocomplete="off"
+              />
+              <datalist id="edit-groups-list-rss">
+                <option v-for="group in availableGroups" :key="group" :value="group" />
+              </datalist>
+            </div>
+            <div class="form-group">
+              <label>
+                <input v-model="editForm.enabled" type="checkbox" />
+                Enabled
+              </label>
+            </div>
+            <div class="form-actions">
+              <button type="button" @click="closeEditPanel" class="cancel-button">Cancel</button>
+              <button type="submit" class="submit-button">Save Changes</button>
+            </div>
+          </form>
+
+          <!-- GitHub Edit Form -->
+          <form v-if="editingSource && editingSource.source_type === 'github'" @submit.prevent="saveEdit" class="source-form">
+            <div class="form-group">
+              <label>Name</label>
+              <input v-model="editForm.name" type="text" required placeholder="e.g., My Project" />
+            </div>
+            <div class="form-group">
+              <label>Owner</label>
+              <input v-model="editForm.owner" type="text" required placeholder="username or org" />
+            </div>
+            <div class="form-group">
+              <label>Repository</label>
+              <input v-model="editForm.repo" type="text" required placeholder="repo-name" />
+            </div>
+            <div class="form-group">
+              <label>GitHub Token (leave blank to keep existing)</label>
+              <input v-model="editForm.token" type="password" placeholder="ghp_..." />
+            </div>
+            <div class="form-group">
+              <label>
+                <input v-model="editForm.assignedOnly" type="checkbox" />
+                Only show assigned issues/PRs
+              </label>
+            </div>
+            <div class="form-group">
+              <label>Group (optional)</label>
+              <input 
+                v-model="editForm.group" 
+                type="text" 
+                placeholder="e.g., Work, Personal, etc." 
+                list="edit-groups-list-github"
+                autocomplete="off"
+              />
+              <datalist id="edit-groups-list-github">
+                <option v-for="group in availableGroups" :key="group" :value="group" />
+              </datalist>
+            </div>
+            <div class="form-group">
+              <label>
+                <input v-model="editForm.enabled" type="checkbox" />
+                Enabled
+              </label>
+            </div>
+            <div class="form-actions">
+              <button type="button" @click="closeEditPanel" class="cancel-button">Cancel</button>
+              <button type="submit" class="submit-button">Save Changes</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -158,6 +258,7 @@ const { sources, loading, error, fetchSources, addSource, updateSource, removeSo
 
 const syncingSources = ref<Set<number>>(new Set());
 const deletingSources = ref<Set<number>>(new Set());
+const editingSource = ref<Source | null>(null);
 
 const newSourceType = ref<'rss' | 'github'>('rss');
 
@@ -186,6 +287,19 @@ const githubForm = ref({
   token: '',
   assignedOnly: false,
   group: '',
+});
+
+// Edit form - will be populated when editing
+const editForm = ref({
+  name: '',
+  url: '',
+  pollInterval: '',
+  owner: '',
+  repo: '',
+  token: '',
+  assignedOnly: false,
+  group: '',
+  enabled: true,
 });
 
 const addRssSource = async () => {
@@ -229,9 +343,91 @@ const toggleSource = async (id: number, enabled: boolean) => {
 };
 
 const editSource = (source: Source) => {
-  // TODO: Implement edit modal/form
-  alert('Edit functionality coming soon! For now, you can delete and re-add the source with new settings.');
-  console.log('Edit source:', source);
+  console.log('Editing source:', source);
+  editingSource.value = source;
+  
+  // Parse config_json if it's a string
+  let config: Record<string, any> = {};
+  if (typeof source.config_json === 'string') {
+    try {
+      config = JSON.parse(source.config_json);
+    } catch (e) {
+      console.error('Failed to parse config_json:', e);
+      config = {};
+    }
+  } else {
+    config = source.config_json || {};
+  }
+  
+  // Populate edit form based on source type
+  editForm.value.name = source.name;
+  editForm.value.enabled = source.enabled;
+  editForm.value.group = source.group || '';
+  
+  if (source.source_type === 'rss') {
+    editForm.value.url = config.url || '';
+    editForm.value.pollInterval = config.poll_interval || '10m';
+    console.log('RSS form populated:', editForm.value);
+  } else if (source.source_type === 'github') {
+    editForm.value.owner = config.owner || '';
+    editForm.value.repo = config.repo || '';
+    editForm.value.assignedOnly = config.assigned_only || false;
+    // Token is stored separately, so we leave it blank (user can update if needed)
+    editForm.value.token = '';
+    console.log('GitHub form populated:', editForm.value);
+  }
+};
+
+const closeEditPanel = () => {
+  editingSource.value = null;
+  // Reset form
+  editForm.value = {
+    name: '',
+    url: '',
+    pollInterval: '',
+    owner: '',
+    repo: '',
+    token: '',
+    assignedOnly: false,
+    group: '',
+    enabled: true,
+  };
+};
+
+const saveEdit = async () => {
+  if (!editingSource.value) return;
+  
+  try {
+    const update: UpdateSourceInput = {
+      name: editForm.value.name,
+      enabled: editForm.value.enabled,
+      group: editForm.value.group || null,
+    };
+    
+    if (editingSource.value.source_type === 'rss') {
+      update.config_json = {
+        url: editForm.value.url,
+        poll_interval: editForm.value.pollInterval || '10m',
+      };
+    } else if (editingSource.value.source_type === 'github') {
+      update.config_json = {
+        owner: editForm.value.owner,
+        repo: editForm.value.repo,
+        assigned_only: editForm.value.assignedOnly,
+      };
+      // Only update token if a new one was provided
+      if (editForm.value.token) {
+        update.token = editForm.value.token;
+      }
+    }
+    
+    await updateSource(editingSource.value.id, update);
+    closeEditPanel();
+  } catch (e) {
+    const errorMsg = e instanceof Error ? e.message : String(e);
+    console.error('Failed to update source:', e);
+    error.value = `Failed to update source: ${errorMsg}`;
+  }
 };
 
 const removeSource = async (id: number) => {
@@ -523,10 +719,142 @@ onMounted(() => {
   border-radius: 4px;
   cursor: pointer;
   font-size: 16px;
+  transition: all 0.2s;
 }
 
 .submit-button:hover {
   background: #2952b8;
+}
+
+/* Edit Panel Styles */
+.edit-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.edit-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 500px;
+  max-width: 90vw;
+  height: 100vh;
+  background: white;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  z-index: 1001;
+  animation: slideInRight 0.3s ease-out;
+  overflow-y: auto;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.edit-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #f8f9fa;
+  position: relative;
+}
+
+.edit-panel-header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  flex: 1;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 32px;
+  line-height: 1;
+  cursor: pointer;
+  color: #666;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+  position: absolute;
+  top: 20px;
+  right: 20px;
+}
+
+.close-button:hover {
+  background: #e0e0e0;
+  color: #333;
+}
+
+.edit-panel-content {
+  padding: 20px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.edit-panel-content .source-form {
+  max-width: 100%;
+  width: 100%;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.cancel-button {
+  flex: 1;
+  padding: 12px 24px;
+  border: 1px solid #ddd;
+  background: white;
+  color: #333;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+
+.cancel-button:hover {
+  background: #f5f5f5;
+  border-color: #bbb;
+}
+
+.form-actions .submit-button {
+  flex: 1;
+  padding: 12px 24px;
+  font-weight: 500;
 }
 </style>
 

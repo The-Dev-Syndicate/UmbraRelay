@@ -13,9 +13,9 @@ export interface Item {
 
 export interface Source {
   id: number;
-  type: 'rss' | 'github';
+  source_type: 'rss' | 'github';
   name: string;
-  config_json: Record<string, any>;
+  config_json: Record<string, any> | string; // Can be string from backend or parsed object
   enabled: boolean;
   last_synced_at: number | null;
   group?: string | null;
