@@ -3,6 +3,47 @@ use anyhow::{Result, Context};
 use reqwest::blocking::Client;
 use rss::Channel;
 use std::time::Duration;
+use regex::Regex;
+
+// Strip HTML tags and decode entities from text
+fn strip_html(html: &str) -> String {
+    // Remove HTML tags using regex
+    let re = Regex::new(r"<[^>]*>").unwrap_or_else(|_| Regex::new("").unwrap());
+    let mut text = re.replace_all(html, "").to_string();
+    
+    // Decode common HTML entities
+    text = text.replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&amp;", "&")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&nbsp;", " ")
+        .replace("&apos;", "'");
+    
+    // Remove common unwanted patterns like "Comments" links
+    // Remove lines that are just "Comments" or similar link text
+    let lines: Vec<&str> = text.lines().collect();
+    let filtered_lines: Vec<&str> = lines.iter()
+        .filter(|line| {
+            let trimmed = line.trim().to_lowercase();
+            // Filter out lines that are just "comments", "read more", etc.
+            !trimmed.eq("comments") 
+                && !trimmed.starts_with("comments")
+                && !trimmed.eq("read more")
+                && !trimmed.is_empty()
+        })
+        .copied()
+        .collect();
+    
+    let cleaned = filtered_lines.join(" ").trim().to_string();
+    
+    // If the cleaned text is just "Comments" or similar, return empty
+    if cleaned.to_lowercase().trim() == "comments" || cleaned.trim().is_empty() {
+        return String::new();
+    }
+    
+    cleaned
+}
 
 pub struct RssIngester {
     url: String,
@@ -44,7 +85,11 @@ impl IngestSource for RssIngester {
                     });
                 
                 let title = item.title().unwrap_or("Untitled").to_string();
-                let summary = item.description().map(|s| s.to_string());
+                let summary = item.description()
+                    .and_then(|s| {
+                        let cleaned = strip_html(s);
+                        if cleaned.is_empty() { None } else { Some(cleaned) }
+                    });
                 let url = item.link().unwrap_or("").to_string();
                 
                 // Parse pub_date if available

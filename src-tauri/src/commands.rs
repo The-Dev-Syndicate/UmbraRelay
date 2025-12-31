@@ -1,5 +1,5 @@
 use crate::storage::{Database, models::{Source, Item}};
-use crate::config::{load_config, save_config, Config, TokenStore};
+use crate::config::TokenStore;
 use crate::ingestion::{RssIngester, GitHubIngester, traits::IngestSource};
 use crate::normalization::normalize_and_dedupe;
 use anyhow::Result;
@@ -13,6 +13,7 @@ pub struct SourceInput {
     pub name: String,
     pub config_json: serde_json::Value,
     pub token: Option<String>, // For GitHub sources
+    pub group: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -21,15 +22,17 @@ pub struct UpdateSourceInput {
     pub config_json: Option<serde_json::Value>,
     pub enabled: Option<bool>,
     pub token: Option<String>,
+    pub group: Option<Option<String>>, // Option<Option> to allow setting to None
 }
 
 #[tauri::command]
 pub async fn get_items(
     db: State<'_, Mutex<Database>>,
     state_filter: Option<String>,
+    group_filter: Option<String>,
 ) -> Result<Vec<Item>, String> {
     let db = db.lock().map_err(|e| format!("Database lock error: {}", e))?;
-    db.get_items(state_filter.as_deref())
+    db.get_items(state_filter.as_deref(), group_filter.as_deref())
         .map_err(|e| format!("Failed to get items: {}", e))
 }
 
@@ -77,6 +80,7 @@ pub async fn add_source(
         &source.source_type,
         &source.name,
         &config_json_str,
+        source.group.as_deref(),
     ).map_err(|e| format!("Failed to create source: {}", e))?;
     
     // Store token if provided (for GitHub sources)
@@ -111,6 +115,7 @@ pub async fn update_source(
         update.name.as_deref(),
         config_json_str.as_deref(),
         update.enabled,
+        update.group.as_ref().map(|g| g.as_deref()),
     ).map_err(|e| format!("Failed to update source: {}", e))?;
     
     // Update token if provided
@@ -229,20 +234,4 @@ pub async fn sync_source(
     Ok(())
 }
 
-#[tauri::command]
-pub async fn get_config(
-    _app: AppHandle,
-) -> Result<Config, String> {
-    load_config()
-        .map_err(|e| format!("Failed to load config: {}", e))
-}
-
-#[tauri::command]
-pub async fn update_config(
-    _app: AppHandle,
-    config: Config,
-) -> Result<(), String> {
-    save_config(&config)
-        .map_err(|e| format!("Failed to save config: {}", e))
-}
 

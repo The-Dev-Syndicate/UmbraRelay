@@ -18,6 +18,7 @@ export interface Source {
   config_json: Record<string, any>;
   enabled: boolean;
   last_synced_at: number | null;
+  group?: string | null;
 }
 
 export interface SourceInput {
@@ -25,6 +26,7 @@ export interface SourceInput {
   name: string;
   config_json: Record<string, any>;
   token?: string;
+  group?: string | null;
 }
 
 export interface UpdateSourceInput {
@@ -32,5 +34,6 @@ export interface UpdateSourceInput {
   config_json?: Record<string, any>;
   enabled?: boolean;
   token?: string;
+  group?: string | null;
 }
 

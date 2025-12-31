@@ -64,6 +64,12 @@ impl Database {
                 CREATE INDEX IF NOT EXISTS idx_events_item_id ON events(item_id);
                 "#
             ),
+            M::up(
+                r#"
+                ALTER TABLE sources ADD COLUMN "group" TEXT;
+                CREATE INDEX IF NOT EXISTS idx_sources_group ON sources("group");
+                "#
+            ),
         ]);
 
         migrations.to_latest(&mut conn)
@@ -82,12 +88,12 @@ impl Database {
 
 
     // Source CRUD operations
-    pub fn create_source(&self, source_type: &str, name: &str, config_json: &str) -> Result<i64> {
+    pub fn create_source(&self, source_type: &str, name: &str, config_json: &str, group: Option<&str>) -> Result<i64> {
         let conn = self.conn.lock().unwrap();
         let now = Utc::now().timestamp();
         conn.execute(
-            "INSERT INTO sources (type, name, config_json, enabled, created_at, updated_at) VALUES (?1, ?2, ?3, 1, ?4, ?4)",
-            params![source_type, name, config_json, now],
+            r#"INSERT INTO sources (type, name, config_json, enabled, "group", created_at, updated_at) VALUES (?1, ?2, ?3, 1, ?4, ?5, ?5)"#,
+            params![source_type, name, config_json, group, now],
         )?;
         Ok(conn.last_insert_rowid())
     }
@@ -95,7 +101,7 @@ impl Database {
     pub fn get_all_sources(&self) -> Result<Vec<Source>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, type, name, config_json, enabled, last_synced_at, created_at, updated_at FROM sources ORDER BY created_at DESC"
+            r#"SELECT id, type, name, config_json, enabled, last_synced_at, "group", created_at, updated_at FROM sources ORDER BY created_at DESC"#
         )?;
         let sources = stmt.query_map([], |row| Source::from_row(row))?
             .collect::<Result<Vec<_>, _>>()?;
@@ -105,12 +111,12 @@ impl Database {
     pub fn get_source(&self, id: i64) -> Result<Source> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, type, name, config_json, enabled, last_synced_at, created_at, updated_at FROM sources WHERE id = ?1"
+            r#"SELECT id, type, name, config_json, enabled, last_synced_at, "group", created_at, updated_at FROM sources WHERE id = ?1"#
         )?;
         stmt.query_row(params![id], |row| Source::from_row(row))
     }
 
-    pub fn update_source(&self, id: i64, name: Option<&str>, config_json: Option<&str>, enabled: Option<bool>) -> Result<()> {
+    pub fn update_source(&self, id: i64, name: Option<&str>, config_json: Option<&str>, enabled: Option<bool>, group: Option<Option<&str>>) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         let now = Utc::now().timestamp();
         
@@ -132,6 +138,13 @@ impl Database {
             conn.execute(
                 "UPDATE sources SET enabled = ?1, updated_at = ?2 WHERE id = ?3",
                 params![if enabled { 1 } else { 0 }, now, id],
+            )?;
+        }
+        
+        if let Some(group) = group {
+            conn.execute(
+                r#"UPDATE sources SET "group" = ?1, updated_at = ?2 WHERE id = ?3"#,
+                params![group, now, id],
             )?;
         }
         
@@ -194,21 +207,54 @@ impl Database {
         }
     }
 
-    pub fn get_items(&self, state_filter: Option<&str>) -> Result<Vec<Item>> {
+    pub fn get_items(&self, state_filter: Option<&str>, group_filter: Option<&str>) -> Result<Vec<Item>> {
         let conn = self.conn.lock().unwrap();
-        let query = if state_filter.is_some() {
-            "SELECT id, source_id, external_id, title, summary, url, item_type, state, created_at, updated_at FROM items WHERE state = ?1 ORDER BY created_at DESC"
-        } else {
-            "SELECT id, source_id, external_id, title, summary, url, item_type, state, created_at, updated_at FROM items ORDER BY created_at DESC"
-        };
         
-        let mut stmt = conn.prepare(query)?;
-        let items: Vec<Item> = if let Some(state) = state_filter {
-            stmt.query_map(params![state], |row| Item::from_row(row))?
-                .collect::<Result<Vec<_>, _>>()?
-        } else {
-            stmt.query_map([], |row| Item::from_row(row))?
-                .collect::<Result<Vec<_>, _>>()?
+        // Build query based on filters
+        let mut query = "SELECT i.id, i.source_id, i.external_id, i.title, i.summary, i.url, i.item_type, i.state, i.created_at, i.updated_at FROM items i".to_string();
+        let mut conditions = Vec::new();
+        
+        if group_filter.is_some() {
+            query.push_str(" INNER JOIN sources s ON i.source_id = s.id");
+        }
+        
+        if let Some(_) = state_filter {
+            conditions.push("i.state = ?1");
+        }
+        
+        if let Some(_) = group_filter {
+            if state_filter.is_some() {
+                conditions.push(r#"s."group" = ?2"#);
+            } else {
+                conditions.push(r#"s."group" = ?1"#);
+            }
+        }
+        
+        if !conditions.is_empty() {
+            query.push_str(" WHERE ");
+            query.push_str(&conditions.join(" AND "));
+        }
+        
+        query.push_str(" ORDER BY i.created_at DESC");
+        
+        let mut stmt = conn.prepare(&query)?;
+        let items: Vec<Item> = match (state_filter, group_filter) {
+            (Some(state), Some(group)) => {
+                stmt.query_map(params![state, group], |row| Item::from_row(row))?
+                    .collect::<Result<Vec<_>, _>>()?
+            }
+            (Some(state), None) => {
+                stmt.query_map(params![state], |row| Item::from_row(row))?
+                    .collect::<Result<Vec<_>, _>>()?
+            }
+            (None, Some(group)) => {
+                stmt.query_map(params![group], |row| Item::from_row(row))?
+                    .collect::<Result<Vec<_>, _>>()?
+            }
+            (None, None) => {
+                stmt.query_map([], |row| Item::from_row(row))?
+                    .collect::<Result<Vec<_>, _>>()?
+            }
         };
         Ok(items)
     }

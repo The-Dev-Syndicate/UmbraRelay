@@ -9,6 +9,8 @@ pub struct Source {
     pub config_json: String,
     pub enabled: bool,
     pub last_synced_at: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -36,8 +38,9 @@ impl Source {
             config_json: row.get(3)?,
             enabled: row.get::<_, i64>(4)? != 0,
             last_synced_at: row.get(5)?,
-            created_at: row.get(6)?,
-            updated_at: row.get(7)?,
+            group: row.get(6)?,
+            created_at: row.get(7)?,
+            updated_at: row.get(8)?,
         })
     }
 }

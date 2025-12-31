@@ -2,15 +2,25 @@
   <div class="inbox-view">
     <div class="header">
       <h1>Inbox</h1>
-      <div class="filters">
-        <button
-          v-for="filter in filters"
-          :key="filter"
-          :class="{ active: currentFilter === filter }"
-          @click="setFilter(filter)"
-        >
-          {{ filter }}
-        </button>
+      <div class="filters-container">
+        <div class="filters">
+          <button
+            v-for="filter in filters"
+            :key="filter"
+            :class="{ active: currentFilter === filter }"
+            @click="setFilter(filter)"
+          >
+            {{ filter }}
+          </button>
+        </div>
+        <div class="group-filter">
+          <select v-model="currentGroupFilter" @change="setGroupFilter" class="group-select">
+            <option value="">All Groups</option>
+            <option v-for="group in availableGroups" :key="group" :value="group">
+              {{ group }}
+            </option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -28,11 +38,13 @@
         @click="selectItem(item.id)"
       >
         <div class="item-header">
-          <span class="item-type">{{ item.item_type }}</span>
-          <span class="item-state">{{ item.state }}</span>
+          <div class="item-badges">
+            <span class="item-type-badge">{{ item.item_type.toUpperCase() }}</span>
+            <span class="item-state-badge" :class="item.state">{{ item.state.toUpperCase() }}</span>
+          </div>
         </div>
         <h3 class="item-title">{{ item.title }}</h3>
-        <p v-if="item.summary" class="item-summary">{{ truncate(item.summary, 150) }}</p>
+        <p v-if="item.summary && stripHtml(item.summary).trim() && stripHtml(item.summary).toLowerCase() !== 'comments'" class="item-summary">{{ truncate(stripHtml(item.summary), 200) }}</p>
         <div class="item-footer">
           <span class="item-date">{{ formatDate(item.created_at) }}</span>
         </div>
@@ -44,27 +56,43 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useItems } from '../composables/useItems';
+import { useSources } from '../composables/useSources';
 
 const emit = defineEmits<{
   (e: 'select-item', id: number): void;
 }>();
 
 const { items, loading, error, fetchItems } = useItems();
+const { sources, fetchSources } = useSources();
 const currentFilter = ref<string | null>(null);
+const currentGroupFilter = ref<string>('');
 
 const filters = ['All', 'Unread', 'Read', 'Archived'];
 
+// Get available groups from sources
+const availableGroups = computed(() => {
+  const groups = new Set<string>();
+  sources.value.forEach(source => {
+    if (source.group) {
+      groups.add(source.group);
+    }
+  });
+  return Array.from(groups).sort();
+});
+
 const filteredItems = computed(() => {
-  if (!currentFilter.value || currentFilter.value === 'all') {
-    return items.value;
-  }
-  return items.value.filter(item => item.state === currentFilter.value);
+  // Filtering is now done on the backend, so just return items
+  return items.value;
 });
 
 const setFilter = (filter: string) => {
   const filterValue = filter === 'All' ? null : filter.toLowerCase();
   currentFilter.value = filterValue;
-  fetchItems(filterValue || undefined);
+  fetchItems(filterValue || undefined, currentGroupFilter.value || undefined);
+};
+
+const setGroupFilter = () => {
+  fetchItems(currentFilter.value || undefined, currentGroupFilter.value || undefined);
 };
 
 const selectItem = (id: number) => {
@@ -76,12 +104,20 @@ const truncate = (text: string, length: number) => {
   return text.substring(0, length) + '...';
 };
 
+const stripHtml = (html: string) => {
+  // Remove HTML tags and decode entities
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return tmp.textContent || tmp.innerText || '';
+};
+
 const formatDate = (timestamp: number) => {
   const date = new Date(timestamp * 1000);
   return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
 };
 
 onMounted(() => {
+  fetchSources();
   fetchItems();
 });
 </script>
@@ -104,9 +140,34 @@ onMounted(() => {
   margin: 0;
 }
 
+.filters-container {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
 .filters {
   display: flex;
   gap: 10px;
+}
+
+.group-filter {
+  display: flex;
+  align-items: center;
+}
+
+.group-select {
+  padding: 8px 16px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.group-select:focus {
+  outline: none;
+  border-color: #396cd8;
 }
 
 .filters button {
@@ -140,62 +201,106 @@ onMounted(() => {
 }
 
 .item-card {
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 20px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
   background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .item-card:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   transform: translateY(-2px);
+  border-color: #396cd8;
 }
 
 .item-card.unread {
   border-left: 4px solid #396cd8;
+  background: #f8f9ff;
 }
 
 .item-card.read {
-  opacity: 0.7;
+  opacity: 0.85;
+}
+
+.item-card.archived {
+  opacity: 0.6;
 }
 
 .item-header {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 8px;
-  font-size: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.item-badges {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.item-type-badge {
+  font-size: 10px;
+  font-weight: 600;
   text-transform: uppercase;
-}
-
-.item-type {
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: #f0f0f0;
   color: #666;
+  letter-spacing: 0.5px;
 }
 
-.item-state {
-  color: #396cd8;
-  font-weight: bold;
+.item-state-badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.item-state-badge.unread {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.item-state-badge.read {
+  background: #e8f5e9;
+  color: #388e3c;
+}
+
+.item-state-badge.archived {
+  background: #f5f5f5;
+  color: #757575;
 }
 
 .item-title {
-  margin: 0 0 8px 0;
-  font-size: 18px;
+  margin: 0 0 12px 0;
+  font-size: 20px;
   font-weight: 600;
+  line-height: 1.4;
+  color: #1a1a1a;
 }
 
 .item-summary {
-  margin: 0 0 8px 0;
+  margin: 0 0 12px 0;
   color: #666;
-  line-height: 1.5;
+  line-height: 1.6;
+  font-size: 14px;
 }
 
 .item-footer {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   font-size: 12px;
   color: #999;
-  margin-top: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
 }
 </style>
 

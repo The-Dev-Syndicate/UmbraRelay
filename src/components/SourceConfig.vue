@@ -3,14 +3,20 @@
     <h1>Sources</h1>
 
     <div v-if="loading" class="loading">Loading...</div>
-    <div v-else-if="error" class="error">{{ error }}</div>
+    <div v-if="error" class="error-message">
+      {{ error }}
+      <button @click="error = null" class="dismiss-error">×</button>
+    </div>
 
     <div class="sources-list">
       <div v-for="source in sources" :key="source.id" class="source-card">
         <div class="source-header">
           <div>
             <h3>{{ source.name }}</h3>
-            <span class="source-type">{{ source.type }}</span>
+            <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px;">
+              <span class="source-type">{{ source.type }}</span>
+              <span v-if="source.group" class="source-group">{{ source.group }}</span>
+            </div>
           </div>
           <div class="source-actions">
             <label class="toggle">
@@ -21,9 +27,22 @@
               />
               <span>{{ source.enabled ? 'Enabled' : 'Disabled' }}</span>
             </label>
-            <button @click="syncSource(source.id)" class="sync-button">Sync</button>
+            <button 
+              @click="handleSyncSource(source.id)" 
+              class="sync-button"
+              :disabled="syncingSources.has(source.id)"
+            >
+              {{ syncingSources.has(source.id) ? 'Syncing...' : 'Sync' }}
+            </button>
             <button @click="editSource(source)" class="edit-button">Edit</button>
-            <button @click="removeSource(source.id)" class="delete-button">Delete</button>
+            <button 
+              @click.stop="removeSource(source.id)" 
+              class="delete-button"
+              :disabled="deletingSources.has(source.id)"
+              type="button"
+            >
+              {{ deletingSources.has(source.id) ? 'Deleting...' : 'Delete' }}
+            </button>
           </div>
         </div>
         <div class="source-info">
@@ -65,6 +84,22 @@
           <label>Poll Interval (optional)</label>
           <input v-model="rssForm.pollInterval" type="text" placeholder="10m" />
         </div>
+        <div class="form-group">
+          <label>Group (optional) - Create or select a group to organize your feeds</label>
+          <input 
+            v-model="rssForm.group" 
+            type="text" 
+            placeholder="e.g., News, Tech, Work, Personal..." 
+            list="groups-list-rss"
+            autocomplete="off"
+          />
+          <datalist id="groups-list-rss">
+            <option v-for="group in availableGroups" :key="group" :value="group" />
+          </datalist>
+          <small style="color: #666; font-size: 12px; margin-top: 4px; display: block;">
+            Type a new group name or select from existing groups above
+          </small>
+        </div>
         <button type="submit" class="submit-button">Add RSS Feed</button>
       </form>
 
@@ -91,6 +126,22 @@
             Only show assigned issues/PRs
           </label>
         </div>
+        <div class="form-group">
+          <label>Group (optional) - Create or select a group to organize your feeds</label>
+          <input 
+            v-model="githubForm.group" 
+            type="text" 
+            placeholder="e.g., Work, Personal, Projects..." 
+            list="groups-list-github"
+            autocomplete="off"
+          />
+          <datalist id="groups-list-github">
+            <option v-for="group in availableGroups" :key="group" :value="group" />
+          </datalist>
+          <small style="color: #666; font-size: 12px; margin-top: 4px; display: block;">
+            Type a new group name or select from existing groups above
+          </small>
+        </div>
         <button type="submit" class="submit-button">Add GitHub Source</button>
       </form>
     </div>
@@ -98,18 +149,34 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useSources } from '../composables/useSources';
+import { ask, MessageDialogOptions } from '@tauri-apps/plugin-dialog';
 import type { Source, SourceInput } from '../types';
 
 const { sources, loading, error, fetchSources, addSource, updateSource, removeSource: removeSourceAction, syncSource } = useSources();
 
+const syncingSources = ref<Set<number>>(new Set());
+const deletingSources = ref<Set<number>>(new Set());
+
 const newSourceType = ref<'rss' | 'github'>('rss');
+
+// Get available groups from existing sources
+const availableGroups = computed(() => {
+  const groups = new Set<string>();
+  sources.value.forEach(source => {
+    if (source.group) {
+      groups.add(source.group);
+    }
+  });
+  return Array.from(groups).sort();
+});
 
 const rssForm = ref({
   name: '',
   url: '',
   pollInterval: '10m',
+  group: '',
 });
 
 const githubForm = ref({
@@ -118,6 +185,7 @@ const githubForm = ref({
   repo: '',
   token: '',
   assignedOnly: false,
+  group: '',
 });
 
 const addRssSource = async () => {
@@ -128,12 +196,13 @@ const addRssSource = async () => {
       url: rssForm.value.url,
       poll_interval: rssForm.value.pollInterval || '10m',
     },
+    group: rssForm.value.group || null,
   };
 
   await addSource(source);
   
   // Reset form
-  rssForm.value = { name: '', url: '', pollInterval: '10m' };
+  rssForm.value = { name: '', url: '', pollInterval: '10m', group: '' };
 };
 
 const addGitHubSource = async () => {
@@ -146,12 +215,13 @@ const addGitHubSource = async () => {
       assigned_only: githubForm.value.assignedOnly,
     },
     token: githubForm.value.token,
+    group: githubForm.value.group || null,
   };
 
   await addSource(source);
   
   // Reset form
-  githubForm.value = { name: '', owner: '', repo: '', token: '', assignedOnly: false };
+  githubForm.value = { name: '', owner: '', repo: '', token: '', assignedOnly: false, group: '' };
 };
 
 const toggleSource = async (id: number, enabled: boolean) => {
@@ -160,12 +230,75 @@ const toggleSource = async (id: number, enabled: boolean) => {
 
 const editSource = (source: Source) => {
   // TODO: Implement edit modal/form
+  alert('Edit functionality coming soon! For now, you can delete and re-add the source with new settings.');
   console.log('Edit source:', source);
 };
 
 const removeSource = async (id: number) => {
-  if (confirm('Are you sure you want to remove this source?')) {
+  console.log('=== DELETE SOURCE START ===');
+  console.log('removeSource called with id:', id);
+  
+  // Find source name for feedback
+  const sourceName = sources.value.find(s => s.id === id)?.name || 'source';
+  
+  // Show confirmation dialog using Tauri's dialog plugin
+  const confirmed = await ask(
+    `Are you sure you want to remove the source: ${sourceName}? This will also delete all items from this source.`,
+    {
+      title: 'Delete Source',
+      kind: 'warning',
+      okLabel: 'Confirm',
+      cancelLabel: 'Cancel',
+    } as MessageDialogOptions
+  );
+  
+  console.log('User confirmed:', confirmed);
+  
+  if (!confirmed) {
+    console.log('User cancelled deletion');
+    return;
+  }
+  
+  console.log('Starting deletion process...');
+  deletingSources.value.add(id);
+  
+  try {
+    console.log('Calling removeSourceAction with id:', id);
     await removeSourceAction(id);
+    console.log('removeSourceAction completed successfully');
+    
+    // Force refresh to ensure UI updates
+    console.log('Refreshing sources list...');
+    await fetchSources();
+    console.log('Sources list refreshed. Current sources:', sources.value.map(s => ({ id: s.id, name: s.name })));
+    
+    console.log(`Source "${sourceName}" deleted successfully`);
+  } catch (e) {
+    const errorMsg = e instanceof Error ? e.message : String(e);
+    console.error('=== DELETE SOURCE ERROR ===', e);
+    error.value = `Failed to remove source: ${errorMsg}`;
+  } finally {
+    deletingSources.value.delete(id);
+    console.log('=== DELETE SOURCE END ===');
+  }
+};
+
+const handleSyncSource = async (id: number) => {
+  syncingSources.value.add(id);
+  try {
+    await syncSource(id);
+    // Show success feedback
+    const source = sources.value.find(s => s.id === id);
+    if (source) {
+      // Force refresh to show updated sync time
+      await fetchSources();
+    }
+  } catch (e) {
+    const errorMsg = e instanceof Error ? e.message : String(e);
+    console.error('Failed to sync source:', e);
+    alert(`Failed to sync source: ${errorMsg}`);
+  } finally {
+    syncingSources.value.delete(id);
   }
 };
 
@@ -186,13 +319,72 @@ onMounted(() => {
   margin: 0 auto;
 }
 
-.loading, .error {
+.loading {
   text-align: center;
   padding: 20px;
 }
 
-.error {
+.error-message {
+  background: #ffebee;
+  border: 1px solid #d32f2f;
   color: #d32f2f;
+  padding: 12px 16px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dismiss-error {
+  background: none;
+  border: none;
+  color: #d32f2f;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.dismiss-error:hover {
+  background: rgba(211, 47, 47, 0.1);
+  border-radius: 50%;
+}
+
+.error-message {
+  background: #ffebee;
+  border: 1px solid #d32f2f;
+  color: #d32f2f;
+  padding: 12px 16px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dismiss-error {
+  background: none;
+  border: none;
+  color: #d32f2f;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dismiss-error:hover {
+  background: rgba(211, 47, 47, 0.1);
+  border-radius: 50%;
 }
 
 .sources-list {
@@ -224,6 +416,15 @@ onMounted(() => {
   color: #666;
 }
 
+.source-group {
+  font-size: 12px;
+  padding: 2px 8px;
+  background: #e3f2fd;
+  color: #1976d2;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
 .source-actions {
   display: flex;
   gap: 10px;
@@ -244,6 +445,11 @@ onMounted(() => {
   cursor: pointer;
   border-radius: 4px;
   font-size: 14px;
+}
+
+.sync-button:disabled, .edit-button:disabled, .delete-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .delete-button {

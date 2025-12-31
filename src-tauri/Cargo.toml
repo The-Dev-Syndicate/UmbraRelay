@@ -21,6 +21,7 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 tauri-plugin-store = "2"
+tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rusqlite = { version = "0.37", features = ["bundled"] }
@@ -31,4 +32,5 @@ rss = "2.0"
 toml = "0.8"
 chrono = { version = "0.4", features = ["serde"] }
 anyhow = "1.0"
+regex = "1"
 

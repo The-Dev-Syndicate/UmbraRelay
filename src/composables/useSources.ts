@@ -44,11 +44,16 @@ export function useSources() {
 
   const removeSource = async (id: number) => {
     try {
+      console.log('Removing source:', id);
       await invoke('remove_source', { id });
+      console.log('Source removed successfully, refreshing list...');
       await fetchSources();
+      console.log('Sources list refreshed');
     } catch (e) {
-      error.value = e as string;
+      const errorMsg = e as string;
+      error.value = errorMsg;
       console.error('Failed to remove source:', e);
+      throw e; // Re-throw so UI can handle it
     }
   };
 
