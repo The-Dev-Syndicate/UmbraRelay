@@ -9,7 +9,8 @@ Technical documentation for developers and contributors.
 3. [Ingestion System](ingestion-system.md) - How RSS and GitHub ingestion works
 4. [Normalization](normalization.md) - Deduplication and normalization logic
 5. [API Reference](api-reference.md) - Tauri command API reference
-6. [Development](development.md) - Development setup and contribution guide
+6. [Console Commands](console-commands.md) - Power user console commands
+7. [Development](development.md) - Development setup and contribution guide
 
 ## Target Audience
 

@@ -328,7 +328,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useSources } from '../composables/useSources';
 import { ask, MessageDialogOptions } from '@tauri-apps/plugin-dialog';
-import type { Source, SourceInput } from '../types';
+import type { Source, SourceInput, UpdateSourceInput } from '../types';
 
 const { sources, loading, error, fetchSources, addSource, updateSource, removeSource: removeSourceAction, syncSource } = useSources();
 

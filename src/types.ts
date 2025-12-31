@@ -15,6 +15,21 @@ export interface Item {
   source_group?: string | null;
 }
 
+export interface CustomView {
+  id: number;
+  name: string;
+  source_ids?: string | null; // JSON array string
+  group_names?: string | null; // JSON array string
+  created_at: number;
+  updated_at: number;
+}
+
+export interface CustomViewInput {
+  name: string;
+  sourceIds?: number[] | null;
+  groupNames?: string[] | null;
+}
+
 export interface Source {
   id: number;
   source_type: 'rss' | 'github';

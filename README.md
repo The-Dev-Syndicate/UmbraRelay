@@ -52,6 +52,7 @@ Comprehensive documentation is available in the `documentation/` folder:
 - **[Getting Started](documentation/getting-started/)** - Installation and basic usage
 - **[User Guide](documentation/user-guide/)** - Detailed feature documentation
 - **[Technical Docs](documentation/technical/)** - Architecture and development
+- **[Console Commands](documentation/technical/console-commands.md)** - Power user console commands
 - **[Examples](documentation/examples/)** - Configuration examples and use cases
 
 ## Configuration

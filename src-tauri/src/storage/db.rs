@@ -76,6 +76,19 @@ impl Database {
                 ALTER TABLE items ADD COLUMN content_html TEXT;
                 "#
             ),
+            M::up(
+                r#"
+                CREATE TABLE IF NOT EXISTS custom_views (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    source_ids TEXT,
+                    group_names TEXT,
+                    created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_custom_views_name ON custom_views(name);
+                "#
+            ),
         ]);
 
         migrations.to_latest(&mut conn)
@@ -225,25 +238,55 @@ impl Database {
         }
     }
 
-    pub fn get_items(&self, state_filter: Option<&str>, group_filter: Option<&str>) -> Result<Vec<Item>> {
+    pub fn get_items(&self, state_filter: Option<&str>, group_filter: Option<&str>, source_ids: Option<&[i64]>, group_names: Option<&[String]>) -> Result<Vec<Item>> {
         let conn = self.conn.lock().unwrap();
         
         // Always JOIN with sources to get source info
         let mut query = "SELECT i.id, i.source_id, i.external_id, i.title, i.summary, i.url, i.item_type, i.state, i.created_at, i.updated_at, i.image_url, i.content_html, s.name as source_name, s.\"group\" as source_group FROM items i INNER JOIN sources s ON i.source_id = s.id".to_string();
-        let mut conditions = Vec::new();
+        let mut conditions: Vec<String> = Vec::new();
         
-        if let Some(_) = state_filter {
-            conditions.push("i.state = ?1");
+        // Build params in order - need to store owned values for string parameters
+        let mut string_params: Vec<String> = Vec::new();
+        let mut int_params: Vec<i64> = Vec::new();
+        
+        // State filter
+        if let Some(state) = state_filter {
+            conditions.push("i.state = ?".to_string());
+            string_params.push(state.to_string());
         }
         
-        if let Some(_) = group_filter {
-            // Support comma-separated groups - check if group appears in the comma-separated string
-            // Match: exact match, at start (group,), in middle (%, group, %), or at end (%, group)
-            if state_filter.is_some() {
-                conditions.push(r#"(s."group" = ?2 OR s."group" LIKE ?3 OR s."group" LIKE ?4 OR s."group" LIKE ?5)"#);
-            } else {
-                conditions.push(r#"(s."group" = ?1 OR s."group" LIKE ?2 OR s."group" LIKE ?3 OR s."group" LIKE ?4)"#);
+        // Source IDs filter (from custom views)
+        if let Some(ids) = source_ids {
+            if !ids.is_empty() {
+                let placeholders: Vec<String> = (1..=ids.len()).map(|_| "?".to_string()).collect();
+                conditions.push(format!("i.source_id IN ({})", placeholders.join(", ")));
+                int_params.extend_from_slice(ids);
             }
+        }
+        
+        // Group names filter (from custom views) - takes precedence over legacy group_filter
+        if let Some(groups) = group_names {
+            if !groups.is_empty() {
+                let mut group_conditions = Vec::new();
+                for _group in groups {
+                    group_conditions.push(r#"(s."group" = ? OR s."group" LIKE ? OR s."group" LIKE ? OR s."group" LIKE ?)"#.to_string());
+                }
+                conditions.push(format!("({})", group_conditions.join(" OR ")));
+                // Collect all string parameters first
+                for group in groups {
+                    string_params.push(group.clone());
+                    string_params.push(format!("{},%", group));
+                    string_params.push(format!("%, {}, %", group));
+                    string_params.push(format!("%, {}", group));
+                }
+            }
+        } else if let Some(group) = group_filter {
+            // Legacy single group filter support
+            conditions.push(r#"(s."group" = ? OR s."group" LIKE ? OR s."group" LIKE ? OR s."group" LIKE ?)"#.to_string());
+            string_params.push(group.to_string());
+            string_params.push(format!("{},%", group));
+            string_params.push(format!("%, {}, %", group));
+            string_params.push(format!("%, {}", group));
         }
         
         if !conditions.is_empty() {
@@ -253,32 +296,50 @@ impl Database {
         
         query.push_str(" ORDER BY i.created_at DESC");
         
+        // Build params vector with proper references
         let mut stmt = conn.prepare(&query)?;
-        let items: Vec<Item> = match (state_filter, group_filter) {
-            (Some(state), Some(group)) => {
-                // For comma-separated groups, check if group appears at start, middle, or end
-                let like_start = format!("{},%", group);
-                let like_middle = format!("%, {}, %", group);
-                let like_end = format!("%, {}", group);
-                stmt.query_map(params![state, group, like_start, like_middle, like_end], |row| Item::from_row_with_source(row))?
-                    .collect::<Result<Vec<_>, _>>()?
+        let items: Vec<Item> = if !string_params.is_empty() || !int_params.is_empty() {
+            let mut params: Vec<&dyn rusqlite::ToSql> = Vec::new();
+            let mut str_idx = 0;
+            let mut int_idx = 0;
+            
+            // Add state if present
+            if state_filter.is_some() {
+                params.push(&string_params[str_idx]);
+                str_idx += 1;
             }
-            (Some(state), None) => {
-                stmt.query_map(params![state], |row| Item::from_row_with_source(row))?
-                    .collect::<Result<Vec<_>, _>>()?
+            
+            // Add source IDs if present
+            if source_ids.is_some() && !int_params.is_empty() {
+                for _ in 0..int_params.len() {
+                    params.push(&int_params[int_idx]);
+                    int_idx += 1;
+                }
             }
-            (None, Some(group)) => {
-                // For comma-separated groups, check if group appears at start, middle, or end
-                let like_start = format!("{},%", group);
-                let like_middle = format!("%, {}, %", group);
-                let like_end = format!("%, {}", group);
-                stmt.query_map(params![group, like_start, like_middle, like_end], |row| Item::from_row_with_source(row))?
-                    .collect::<Result<Vec<_>, _>>()?
+            
+            // Add group parameters if present
+            if let Some(groups) = group_names {
+                if !groups.is_empty() {
+                    for _group in groups {
+                        params.push(&string_params[str_idx]);
+                        params.push(&string_params[str_idx + 1]);
+                        params.push(&string_params[str_idx + 2]);
+                        params.push(&string_params[str_idx + 3]);
+                        str_idx += 4;
+                    }
+                }
+            } else if group_filter.is_some() {
+                params.push(&string_params[str_idx]);
+                params.push(&string_params[str_idx + 1]);
+                params.push(&string_params[str_idx + 2]);
+                params.push(&string_params[str_idx + 3]);
             }
-            (None, None) => {
-                stmt.query_map([], |row| Item::from_row_with_source(row))?
-                    .collect::<Result<Vec<_>, _>>()?
-            }
+            
+            stmt.query_map(rusqlite::params_from_iter(params.iter()), |row| Item::from_row_with_source(row))?
+                .collect::<Result<Vec<_>, _>>()?
+        } else {
+            stmt.query_map([], |row| Item::from_row_with_source(row))?
+                .collect::<Result<Vec<_>, _>>()?
         };
         Ok(items)
     }
@@ -291,6 +352,20 @@ impl Database {
         stmt.query_row(params![id], |row| Item::from_row(row))
     }
 
+    // Cleanup old items (older than specified days, but preserve archived items)
+    pub fn cleanup_old_items(&self, days: i64) -> Result<usize> {
+        let conn = self.conn.lock().unwrap();
+        let cutoff_timestamp = Utc::now().timestamp() - (days * 24 * 60 * 60);
+        
+        // Delete items older than cutoff, but preserve archived items
+        let deleted = conn.execute(
+            "DELETE FROM items WHERE state != 'archived' AND created_at < ?1",
+            params![cutoff_timestamp],
+        )?;
+        
+        Ok(deleted)
+    }
+
     pub fn update_item_state(&self, id: i64, state: &str) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         let now = Utc::now().timestamp();
@@ -298,6 +373,83 @@ impl Database {
             "UPDATE items SET state = ?1, updated_at = ?2 WHERE id = ?3",
             params![state, now, id],
         )?;
+        Ok(())
+    }
+
+    // Update created_at timestamp to make items appear in "leaving soon" (for testing)
+    pub fn make_items_leaving_soon(&self, count: i64) -> Result<usize> {
+        let conn = self.conn.lock().unwrap();
+        let now = Utc::now().timestamp();
+        
+        // Calculate timestamps for items that will be leaving soon (23-29 days old)
+        // We'll create items with different ages: 23, 24, 25, 26, 27, 28, 29 days old
+        let days_old = vec![23, 24, 25, 26, 27, 28, 29];
+        
+        // Get IDs of first N non-archived items
+        let mut stmt = conn.prepare(
+            "SELECT id FROM items WHERE state != 'archived' ORDER BY id LIMIT ?1"
+        )?;
+        let item_ids: Vec<i64> = stmt.query_map(params![count], |row| row.get(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        
+        // Update each item with a different age
+        let mut updated = 0;
+        for (idx, item_id) in item_ids.iter().enumerate() {
+            if let Some(&days) = days_old.get(idx) {
+                let old_timestamp = now - (days * 24 * 60 * 60);
+                let result = conn.execute(
+                    "UPDATE items SET created_at = ?1, updated_at = ?2 WHERE id = ?3",
+                    params![old_timestamp, now, item_id],
+                )?;
+                updated += result;
+            }
+        }
+        
+        Ok(updated)
+    }
+
+    // Custom View operations
+    pub fn create_custom_view(&self, name: &str, source_ids: Option<&str>, group_names: Option<&str>) -> Result<i64> {
+        let conn = self.conn.lock().unwrap();
+        let now = Utc::now().timestamp();
+        conn.execute(
+            "INSERT INTO custom_views (name, source_ids, group_names, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?4)",
+            params![name, source_ids, group_names, now],
+        )?;
+        Ok(conn.last_insert_rowid())
+    }
+
+    pub fn get_all_custom_views(&self) -> Result<Vec<super::models::CustomView>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, name, source_ids, group_names, created_at, updated_at FROM custom_views ORDER BY name"
+        )?;
+        let views = stmt.query_map([], |row| super::models::CustomView::from_row(row))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(views)
+    }
+
+    pub fn get_custom_view(&self, id: i64) -> Result<super::models::CustomView> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, name, source_ids, group_names, created_at, updated_at FROM custom_views WHERE id = ?1"
+        )?;
+        stmt.query_row(params![id], |row| super::models::CustomView::from_row(row))
+    }
+
+    pub fn update_custom_view(&self, id: i64, name: &str, source_ids: Option<&str>, group_names: Option<&str>) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let now = Utc::now().timestamp();
+        conn.execute(
+            "UPDATE custom_views SET name = ?1, source_ids = ?2, group_names = ?3, updated_at = ?4 WHERE id = ?5",
+            params![name, source_ids, group_names, now, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_custom_view(&self, id: i64) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM custom_views WHERE id = ?1", params![id])?;
         Ok(())
     }
 

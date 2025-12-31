@@ -93,4 +93,29 @@ impl Item {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomView {
+    pub id: i64,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_ids: Option<String>, // JSON array of source IDs
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group_names: Option<String>, // JSON array of group names
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+impl CustomView {
+    pub fn from_row(row: &Row) -> rusqlite::Result<CustomView> {
+        Ok(CustomView {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            source_ids: row.get(2)?,
+            group_names: row.get(3)?,
+            created_at: row.get(4)?,
+            updated_at: row.get(5)?,
+        })
+    }
+}
+
 

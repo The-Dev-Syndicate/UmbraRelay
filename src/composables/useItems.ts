@@ -7,11 +7,16 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 
 export function useItems() {
-  const fetchItems = async (stateFilter?: string, groupFilter?: string) => {
+  const fetchItems = async (stateFilter?: string, groupFilter?: string, sourceIds?: number[], groupNames?: string[]) => {
     loading.value = true;
     error.value = null;
     try {
-      items.value = await invoke<Item[]>('get_items', { stateFilter, groupFilter });
+      items.value = await invoke<Item[]>('get_items', { 
+        stateFilter, 
+        groupFilter,
+        sourceIds: sourceIds && sourceIds.length > 0 ? sourceIds : undefined,
+        groupNames: groupNames && groupNames.length > 0 ? groupNames : undefined,
+      });
     } catch (e) {
       error.value = e as string;
       console.error('Failed to fetch items:', e);

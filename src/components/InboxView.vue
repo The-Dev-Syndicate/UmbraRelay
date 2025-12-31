@@ -14,12 +14,47 @@
           </button>
         </div>
         <div class="group-filter">
-          <select v-model="currentGroupFilter" @change="setGroupFilter" class="group-select">
-            <option value="">All Groups</option>
-            <option v-for="group in availableGroups" :key="group" :value="group">
+          <div class="group-filter-dropdown" :class="{ open: showGroupDropdown }">
+            <button 
+              @click="showGroupDropdown = !showGroupDropdown" 
+              class="group-filter-button"
+            >
+              <span v-if="selectedGroups.length === 0">All Groups</span>
+              <span v-else>{{ selectedGroups.length }} selected</span>
+              <span class="dropdown-arrow">▼</span>
+            </button>
+            <div v-if="showGroupDropdown" class="group-filter-menu">
+              <div class="group-filter-header">
+                <span>Filter by Groups</span>
+                <button @click="clearAllGroups" class="clear-all-btn">Clear All</button>
+              </div>
+              <div class="group-filter-options">
+                <label 
+                  v-for="group in availableGroups" 
+                  :key="group" 
+                  class="group-option"
+                >
+                  <input 
+                    type="checkbox" 
+                    :value="group"
+                    v-model="selectedGroups"
+                    @change="applyGroupFilter"
+                  />
+                  <span class="group-option-label">{{ group }}</span>
+                </label>
+              </div>
+            </div>
+          </div>
+          <div v-if="selectedGroups.length > 0" class="selected-groups-pills">
+            <span 
+              v-for="group in selectedGroups" 
+              :key="group" 
+              class="group-pill"
+            >
               {{ group }}
-            </option>
-          </select>
+              <button @click.stop="removeGroup(group)" class="pill-remove">×</button>
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -81,10 +116,11 @@ const emit = defineEmits<{
   (e: 'select-item', id: number): void;
 }>();
 
-const { items, loading, error, fetchItems } = useItems();
+const { items, loading, error, fetchItems, updateItemState } = useItems();
 const { sources, fetchSources } = useSources();
 const currentFilter = ref<string | null>(null);
-const currentGroupFilter = ref<string>('');
+const selectedGroups = ref<string[]>([]);
+const showGroupDropdown = ref(false);
 
 const filters = ['All', 'Unread', 'Read', 'Archived'];
 
@@ -101,21 +137,63 @@ const availableGroups = computed(() => {
 });
 
 const filteredItems = computed(() => {
-  // Filtering is now done on the backend, so just return items
-  return items.value;
+  let filtered = items.value;
+  
+  // Apply state filter
+  if (currentFilter.value) {
+    filtered = filtered.filter(item => item.state === currentFilter.value);
+  }
+  
+  // Apply group filter (multi-select)
+  if (selectedGroups.value.length > 0) {
+    filtered = filtered.filter(item => {
+      if (!item.source_group) return false;
+      const itemGroups = parseGroups(item.source_group);
+      // Check if any of the selected groups match any of the item's groups
+      return selectedGroups.value.some(selectedGroup => 
+        itemGroups.includes(selectedGroup)
+      );
+    });
+  }
+  
+  return filtered;
 });
 
 const setFilter = (filter: string) => {
   const filterValue = filter === 'All' ? null : filter.toLowerCase();
   currentFilter.value = filterValue;
-  fetchItems(filterValue || undefined, currentGroupFilter.value || undefined);
+  // Fetch all items, filtering will be done in computed
+  fetchItems();
 };
 
-const setGroupFilter = () => {
-  fetchItems(currentFilter.value || undefined, currentGroupFilter.value || undefined);
+const applyGroupFilter = () => {
+  // Filtering is done in computed, no need to fetch again
+  // Just close dropdown after a short delay
+  setTimeout(() => {
+    if (selectedGroups.value.length === 0) {
+      showGroupDropdown.value = false;
+    }
+  }, 200);
 };
 
-const selectItem = (id: number) => {
+const removeGroup = (group: string) => {
+  const index = selectedGroups.value.indexOf(group);
+  if (index > -1) {
+    selectedGroups.value.splice(index, 1);
+  }
+};
+
+const clearAllGroups = () => {
+  selectedGroups.value = [];
+  showGroupDropdown.value = false;
+};
+
+const selectItem = async (id: number) => {
+  // Mark item as read if it's currently unread
+  const item = items.value.find(i => i.id === id);
+  if (item && item.state === 'unread') {
+    await updateItemState(id, 'read');
+  }
   emit('select-item', id);
 };
 
@@ -144,6 +222,14 @@ const parseGroups = (groupString: string | null | undefined): string[] => {
 onMounted(() => {
   fetchSources();
   fetchItems();
+  
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    if (!target.closest('.group-filter')) {
+      showGroupDropdown.value = false;
+    }
+  });
 });
 </script>
 
@@ -179,20 +265,157 @@ onMounted(() => {
 .group-filter {
   display: flex;
   align-items: center;
+  gap: 12px;
+  position: relative;
 }
 
-.group-select {
+.group-filter-dropdown {
+  position: relative;
+}
+
+.group-filter-button {
   padding: 8px 16px;
   border: 1px solid #ddd;
   background: white;
   border-radius: 4px;
   font-size: 14px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 140px;
+  justify-content: space-between;
+  transition: all 0.2s;
 }
 
-.group-select:focus {
+.group-filter-button:hover {
+  border-color: #396cd8;
+}
+
+.group-filter-button:focus {
   outline: none;
   border-color: #396cd8;
+}
+
+.dropdown-arrow {
+  font-size: 10px;
+  transition: transform 0.2s;
+}
+
+.group-filter-dropdown.open .dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+.group-filter-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  min-width: 220px;
+  max-width: 300px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.group-filter-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.clear-all-btn {
+  background: none;
+  border: none;
+  color: #396cd8;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.clear-all-btn:hover {
+  background: #f0f0f0;
+}
+
+.group-filter-options {
+  padding: 8px 0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.group-option {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.group-option:hover {
+  background: #f8f9fa;
+}
+
+.group-option input[type="checkbox"] {
+  margin-right: 10px;
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  accent-color: #396cd8;
+}
+
+.group-option-label {
+  font-size: 14px;
+  color: #333;
+  user-select: none;
+}
+
+.selected-groups-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.group-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #396cd8;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.pill-remove {
+  background: rgba(255, 255, 255, 0.3);
+  border: none;
+  color: white;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+  transition: background 0.2s;
+}
+
+.pill-remove:hover {
+  background: rgba(255, 255, 255, 0.5);
 }
 
 .filters button {

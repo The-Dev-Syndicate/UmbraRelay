@@ -52,6 +52,13 @@ pub fn run() {
             commands::update_source,
             commands::remove_source,
             commands::sync_source,
+            commands::cleanup_old_items,
+            commands::make_items_leaving_soon,
+            commands::get_custom_views,
+            commands::get_custom_view,
+            commands::add_custom_view,
+            commands::update_custom_view,
+            commands::remove_custom_view,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
