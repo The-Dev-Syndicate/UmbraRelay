@@ -16,6 +16,7 @@ jobs:
     outputs:
       version: ${{ steps.set_version.outputs.version }}
       release_notes: ${{ steps.release_notes.outputs.body }}
+      release_id: ${{ steps.create_release.outputs.id }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -54,50 +55,6 @@ jobs:
           
           echo "✓ Version updated to $VERSION in all files"
 
-      - name: Create draft release
-        id: create_release
-        shell: bash
-        run: |
-          VERSION="${{ github.ref_name }}"
-          # Create release and get ID
-          RESPONSE=$(gh release create "$VERSION" \
-            --title "UmbraRelay $VERSION" \
-            --notes "${{ steps.release_notes.outputs.body }}" \
-            --draft \
-            --repo ${{ github.repository }} \
-            --json id 2>&1)
-          
-          if [ $? -eq 0 ]; then
-            RELEASE_ID=$(echo "$RESPONSE" | jq -r '.id // empty')
-            if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "null" ]; then
-              echo "id=$RELEASE_ID" >> $GITHUB_OUTPUT
-              echo "✓ Created draft release with ID: $RELEASE_ID"
-            else
-              # Try to get existing release ID
-              EXISTING_ID=$(gh api repos/${{ github.repository }}/releases/tags/$VERSION --jq .id 2>/dev/null || echo "")
-              if [ -n "$EXISTING_ID" ] && [ "$EXISTING_ID" != "null" ]; then
-                echo "id=$EXISTING_ID" >> $GITHUB_OUTPUT
-                echo "✓ Found existing release with ID: $EXISTING_ID"
-              else
-                echo "⚠️  Could not get release ID"
-                echo "id=" >> $GITHUB_OUTPUT
-              fi
-            fi
-          else
-            echo "Release creation response: $RESPONSE"
-            # Try to get existing release ID
-            EXISTING_ID=$(gh api repos/${{ github.repository }}/releases/tags/$VERSION --jq .id 2>/dev/null || echo "")
-            if [ -n "$EXISTING_ID" ] && [ "$EXISTING_ID" != "null" ]; then
-              echo "id=$EXISTING_ID" >> $GITHUB_OUTPUT
-              echo "✓ Found existing release with ID: $EXISTING_ID"
-            else
-              echo "⚠️  Could not create or find release"
-              echo "id=" >> $GITHUB_OUTPUT
-            fi
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Prepare release notes
         id: release_notes
         shell: bash
@@ -127,6 +84,57 @@ jobs:
           echo "body<<EOF" >> $GITHUB_OUTPUT
           echo "$RELEASE_BODY" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create draft release
+        id: create_release
+        shell: bash
+        run: |
+          set +e  # Don't exit on error
+          VERSION="${{ github.ref_name }}"
+          
+          # Check if release already exists first
+          EXISTING_ID=$(gh api repos/${{ github.repository }}/releases/tags/$VERSION --jq .id 2>/dev/null || echo "")
+          if [ -n "$EXISTING_ID" ] && [ "$EXISTING_ID" != "null" ] && [[ "$EXISTING_ID" =~ ^[0-9]+$ ]]; then
+            echo "id=$EXISTING_ID" >> $GITHUB_OUTPUT
+            echo "✓ Release already exists with ID: $EXISTING_ID"
+            exit 0
+          fi
+          
+          # Create release and get ID
+          RESPONSE=$(gh release create "$VERSION" \
+            --title "UmbraRelay $VERSION" \
+            --notes "${{ steps.release_notes.outputs.body }}" \
+            --draft \
+            --repo ${{ github.repository }} \
+            --json id 2>&1)
+          
+          EXIT_CODE=$?
+          if [ $EXIT_CODE -eq 0 ]; then
+            RELEASE_ID=$(echo "$RESPONSE" | jq -r '.id // empty' 2>/dev/null || echo "")
+            if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "null" ] && [[ "$RELEASE_ID" =~ ^[0-9]+$ ]]; then
+              echo "id=$RELEASE_ID" >> $GITHUB_OUTPUT
+              echo "✓ Created draft release with ID: $RELEASE_ID"
+              exit 0
+            fi
+          fi
+          
+          # If we get here, creation failed - try one more time to get existing
+          echo "Release creation failed (exit code: $EXIT_CODE)"
+          echo "Response: $RESPONSE"
+          sleep 2  # Wait a moment
+          EXISTING_ID=$(gh api repos/${{ github.repository }}/releases/tags/$VERSION --jq .id 2>/dev/null || echo "")
+          if [ -n "$EXISTING_ID" ] && [ "$EXISTING_ID" != "null" ] && [[ "$EXISTING_ID" =~ ^[0-9]+$ ]]; then
+            echo "id=$EXISTING_ID" >> $GITHUB_OUTPUT
+            echo "✓ Found existing release with ID: $EXISTING_ID"
+            exit 0
+          fi
+          
+          # Last resort - set empty ID (tauri-action will try to find/create)
+          echo "⚠️  Could not create or find release - tauri-action will handle it"
+          echo "id=" >> $GITHUB_OUTPUT
+          exit 0  # Don't fail the job
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -235,5 +243,4 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "UmbraRelay ${{ github.ref_name }}"
           releaseBody: ${{ needs.prepare-release.outputs.release_notes }}
-          # Don't create release - it's already created in prepare-release
-          releaseId: ${{ needs.prepare-release.outputs.release_id }}
+          releaseDraft: true
