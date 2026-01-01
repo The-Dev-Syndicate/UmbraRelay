@@ -9,11 +9,11 @@
 }
 
 .sidebar {
-  width: 200px;
-  min-width: 200px;
+  width: 180px;
+  min-width: 180px;
   background: #2c3e50;
   color: white;
-  padding: $spacing-lg;
+  padding: $spacing-md;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -21,11 +21,11 @@
 }
 
 .app-title {
-  font-size: $font-xl;
+  font-size: $font-lg;
   font-weight: $font-semibold;
-  margin-bottom: $spacing-2xl;
+  margin-bottom: $spacing-lg;
   color: white;
-  letter-spacing: -0.3px;
+  letter-spacing: -0.2px;
 }
 
 .nav-links {
@@ -41,18 +41,18 @@
 
 .nav-group-header {
   width: 100%;
-  padding: 10px $spacing-md;
+  padding: $spacing-sm $spacing-md;
   background: transparent;
   border: none;
   color: rgba(255, 255, 255, 0.9);
   text-align: left;
   cursor: pointer;
   border-radius: $radius-sm;
-  font-size: 13px;
+  font-size: $font-base;
   font-weight: $font-semibold;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: $spacing-xs;
   transition: all $transition-base;
   white-space: nowrap;
   overflow: hidden;
@@ -91,18 +91,18 @@
 }
 
 .nav-button {
-  padding: $spacing-sm $spacing-md;
+  padding: $spacing-xs $spacing-md;
   background: transparent;
   border: none;
   color: rgba(255, 255, 255, 0.7);
   text-align: left;
   cursor: pointer;
   border-radius: $radius-sm;
-  font-size: $font-base;
+  font-size: $font-sm;
   transition: all $transition-base;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: $spacing-xs;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

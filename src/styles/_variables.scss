@@ -1,14 +1,14 @@
 // Base SCSS Variables
 // These are theme-agnostic variables that don't change between themes
 
-// Spacing
-$spacing-xs: 4px;
-$spacing-sm: 8px;
-$spacing-md: 12px;
-$spacing-lg: 16px;
-$spacing-xl: 20px;
-$spacing-2xl: 24px;
-$spacing-3xl: 40px;
+// Spacing - more compact
+$spacing-xs: 3px;
+$spacing-sm: 6px;
+$spacing-md: 10px;
+$spacing-lg: 14px;
+$spacing-xl: 18px;
+$spacing-2xl: 20px;
+$spacing-3xl: 32px;
 
 // Border radius
 $radius-sm: 4px;
@@ -17,14 +17,14 @@ $radius-lg: 12px;
 $radius-xl: 16px;
 $radius-full: 50%;
 
-// Font sizes
-$font-xs: 10px;
-$font-sm: 11px;
-$font-base: 12px;
-$font-md: 14px;
-$font-lg: 16px;
-$font-xl: 20px;
-$font-2xl: 24px;
+// Font sizes - scaled down for more compact design
+$font-xs: 9px;
+$font-sm: 10px;
+$font-base: 11px;
+$font-md: 12px;
+$font-lg: 14px;
+$font-xl: 18px;
+$font-2xl: 20px;
 
 // Font weights
 $font-normal: 400;

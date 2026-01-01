@@ -6,27 +6,27 @@
   --color-primary-hover: #1976d2;
   --color-primary-text: #ffffff;
   
-  // Background colors
-  --color-bg-primary: #f5f7fa;
-  --color-bg-secondary: #e8ecf1;
+  // Background colors - more distinct blue-tinted backgrounds
+  --color-bg-primary: #f0f5fa;
+  --color-bg-secondary: #e1eaf2;
   --color-bg-card: #ffffff;
-  --color-bg-hover: #e3e8ed;
-  --color-bg-panel: #f0f4f8;
-  --color-bg-unread: #e8f4fd;
+  --color-bg-hover: #d4e3ed;
+  --color-bg-panel: #e8f2f8;
+  --color-bg-unread: #e1f3ff;
   
-  // Text colors
+  // Text colors - slightly cooler blue-tinted grays
   --color-text-primary: #1a2332;
-  --color-text-secondary: #5a6b7a;
-  --color-text-muted: #8a9baa;
+  --color-text-secondary: #3a4a5a;
+  --color-text-muted: #6a7a8a;
   --color-text-inverse: #ffffff;
   
-  // Border colors
-  --color-border: #c8d4e0;
-  --color-border-hover: #a8b8c8;
-  --color-border-light: #e0e8f0;
+  // Border colors - more blue-tinted borders
+  --color-border: #b0c4d8;
+  --color-border-hover: #90a4b8;
+  --color-border-light: #c8d8e8;
   
-  // Shadow colors
-  --color-shadow: rgba(33, 150, 243, 0.15);
+  // Shadow colors - blue-tinted shadows
+  --color-shadow: rgba(33, 150, 243, 0.12);
   
   // State colors
   --color-success: #4caf50;
@@ -38,16 +38,16 @@
   --color-info: #2196f3;
   --color-info-bg: #e3f2fd;
   
-  // Badge colors
-  --color-badge-unread: #e3f2fd;
-  --color-badge-unread-text: #1976d2;
-  --color-badge-read: #e8f5e9;
-  --color-badge-read-text: #388e3c;
-  --color-badge-archived: #eceff1;
-  --color-badge-archived-text: #78909c;
+  // Badge colors - more blue-tinted
+  --color-badge-unread: #bbdefb;
+  --color-badge-unread-text: #1565c0;
+  --color-badge-read: #c8e6c9;
+  --color-badge-read-text: #2e7d32;
+  --color-badge-archived: #cfd8dc;
+  --color-badge-archived-text: #546e7a;
   
-  // Group tag colors
-  --color-group-tag: #e3f2fd;
-  --color-group-tag-text: #1976d2;
+  // Group tag colors - more vibrant blue
+  --color-group-tag: #bbdefb;
+  --color-group-tag-text: #1565c0;
 }
 

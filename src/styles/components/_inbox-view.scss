@@ -11,13 +11,13 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: $spacing-lg;
+  margin-bottom: $spacing-md;
 
   h1 {
     margin: 0;
-    font-size: $font-xl;
+    font-size: $font-lg;
     font-weight: $font-semibold;
-    letter-spacing: -0.3px;
+    letter-spacing: -0.2px;
   }
 }
 
@@ -64,16 +64,16 @@
 }
 
 .group-filter-button {
-  padding: $spacing-sm $spacing-lg;
+  padding: $spacing-xs $spacing-md;
   border: 1px solid var(--color-border);
   background: var(--color-bg-primary);
   border-radius: $radius-sm;
-  font-size: $font-md;
+  font-size: $font-sm;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: $spacing-sm;
-  min-width: 140px;
+  gap: $spacing-xs;
+  min-width: 120px;
   justify-content: space-between;
   transition: all $transition-base;
   color: var(--color-text-primary);
