@@ -16,6 +16,8 @@ jobs:
       release_id: ${{ steps.create_release.outputs.id }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history and tags
       - name: setup node
         uses: actions/setup-node@v4
         with:
@@ -40,73 +42,96 @@ jobs:
           else
             echo "has_changelog=false" >> $GITHUB_OUTPUT
           fi
+      - name: verify tag exists
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          echo "Verifying tag exists: $TAG_NAME"
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "✓ Tag exists locally"
+            git show "$TAG_NAME" --no-patch --format="Tag: %D%nCommit: %H%nAuthor: %an <%ae>%nDate: %ad" || true
+          else
+            echo "⚠️  Tag not found locally, fetching..."
+            git fetch origin tag "$TAG_NAME" || true
+          fi
       - name: create release and get ID
         id: create_release
         run: |
           TAG_NAME="${{ github.ref_name }}"
           RELEASE_NAME="UmbraRelay ${{ github.ref_name }}"
           
+          # Check if release already exists first
+          echo "Checking if release already exists for tag: $TAG_NAME"
+          EXISTING_ID=$(gh api repos/${{ github.repository }}/releases/tags/$TAG_NAME --jq .id 2>/dev/null || echo "")
+          if [ -n "$EXISTING_ID" ] && [ "$EXISTING_ID" != "null" ] && [ "$EXISTING_ID" != "" ]; then
+            echo "✓ Release already exists with ID: $EXISTING_ID"
+            echo "id=$EXISTING_ID" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
           # Prepare release notes
           if [ "${{ steps.changelog.outputs.has_changelog }}" = "true" ] && [ -f changelog_section.md ]; then
-            # Use changelog content
             echo "Using changelog content for release notes"
             NOTES_FILE="changelog_section.md"
             USE_NOTES=true
           else
-            # Will use auto-generated notes via gh release create
             echo "Will use auto-generated release notes"
             USE_NOTES=false
           fi
           
           # Create release and get ID immediately
           echo "Creating release: $RELEASE_NAME for tag: $TAG_NAME"
+          echo "Repository: ${{ github.repository }}"
           
+          # Run the command and capture both stdout and stderr
           if [ "$USE_NOTES" = "true" ]; then
-            # Create release with notes from file
-            RESPONSE=$(gh release create "$TAG_NAME" \
+            echo "Running: gh release create with notes file"
+            if ! RESPONSE=$(gh release create "$TAG_NAME" \
               --title "$RELEASE_NAME" \
               --notes-file "$NOTES_FILE" \
               --draft \
               --repo ${{ github.repository }} \
-              --json id,url,tag_name 2>&1)
+              --json id,url,tag_name 2>&1); then
+              EXIT_CODE=$?
+              echo "❌ Command failed with exit code: $EXIT_CODE"
+              echo "Error output:"
+              echo "$RESPONSE"
+              exit 1
+            fi
           else
-            # Create release with auto-generated notes
-            RESPONSE=$(gh release create "$TAG_NAME" \
+            echo "Running: gh release create with --generate-notes"
+            if ! RESPONSE=$(gh release create "$TAG_NAME" \
               --title "$RELEASE_NAME" \
               --generate-notes \
               --draft \
               --repo ${{ github.repository }} \
-              --json id,url,tag_name 2>&1)
-          fi
-          
-          EXIT_CODE=$?
-          
-          if [ $EXIT_CODE -eq 0 ]; then
-            RELEASE_ID=$(echo "$RESPONSE" | jq -r '.id // empty' 2>/dev/null || echo "")
-            if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "null" ] && [ "$RELEASE_ID" != "" ]; then
-              echo "id=$RELEASE_ID" >> $GITHUB_OUTPUT
-              echo "✓ Release created successfully!"
-              echo "Release ID: $RELEASE_ID"
-              echo "Release details: $RESPONSE"
-            else
-              echo "❌ Failed to extract release ID from response"
-              echo "Response: $RESPONSE"
+              --json id,url,tag_name 2>&1); then
+              EXIT_CODE=$?
+              echo "❌ Command failed with exit code: $EXIT_CODE"
+              echo "Error output:"
+              echo "$RESPONSE"
               exit 1
             fi
+          fi
+          
+          EXIT_CODE=0
+          echo "Command succeeded!"
+          echo "Response: $RESPONSE"
+          
+          RELEASE_ID=$(echo "$RESPONSE" | jq -r '.id // empty' 2>/dev/null || echo "")
+          if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "null" ] && [ "$RELEASE_ID" != "" ]; then
+            echo "id=$RELEASE_ID" >> $GITHUB_OUTPUT
+            echo "✓ Release created successfully!"
+            echo "Release ID: $RELEASE_ID"
           else
-            echo "❌ Failed to create release"
-            echo "Exit code: $EXIT_CODE"
-            echo "Response: $RESPONSE"
-            
-            # Check if release already exists (maybe from a previous failed run)
-            echo "Checking if release already exists..."
-            EXISTING=$(gh api repos/${{ github.repository }}/releases/tags/$TAG_NAME --jq .id 2>/dev/null || echo "")
-            if [ -n "$EXISTING" ] && [ "$EXISTING" != "null" ]; then
-              echo "Release already exists with ID: $EXISTING"
-              echo "id=$EXISTING" >> $GITHUB_OUTPUT
+            echo "⚠️  Could not extract ID from JSON, trying API lookup..."
+            sleep 2
+            FALLBACK_ID=$(gh api repos/${{ github.repository }}/releases/tags/$TAG_NAME --jq .id 2>/dev/null || echo "")
+            if [ -n "$FALLBACK_ID" ] && [ "$FALLBACK_ID" != "null" ] && [ "$FALLBACK_ID" != "" ]; then
+              echo "id=$FALLBACK_ID" >> $GITHUB_OUTPUT
+              echo "✓ Got release ID via API: $FALLBACK_ID"
             else
-              echo "Full error details:"
-              echo "$RESPONSE"
+              echo "❌ Could not get release ID from response or API"
+              echo "Response was: $RESPONSE"
               exit 1
             fi
           fi
