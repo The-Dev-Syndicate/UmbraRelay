@@ -40,19 +40,14 @@ export function useSources() {
         config_json: update.config_json,
         enabled: update.enabled,
         token: update.token,
-        group_ids: update.group_ids ? (Array.isArray(update.group_ids) ? [...update.group_ids] : update.group_ids) : null,
+        group_ids: update.group_ids ? (Array.isArray(update.group_ids) ? [...update.group_ids] : update.group_ids) : undefined,
       };
-      console.log('updateSource: calling invoke with', { id, update: serializedUpdate });
-      console.log('updateSource: serialized group_ids type:', typeof serializedUpdate.group_ids, Array.isArray(serializedUpdate.group_ids));
       
-      const result = await invoke('update_source', { id, update: serializedUpdate });
-      console.log('updateSource: invoke completed', result);
+      await invoke('update_source', { id, update: serializedUpdate });
       await fetchSources();
-      console.log('updateSource: fetchSources completed');
     } catch (e) {
       error.value = e as string;
       console.error('Failed to update source:', e);
-      console.error('Error details:', JSON.stringify(e, null, 2));
       throw e; // Re-throw so UI can handle it
     }
   };

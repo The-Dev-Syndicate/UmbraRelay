@@ -132,22 +132,17 @@ pub async fn update_source(
     id: i64,
     update: UpdateSourceInput,
 ) -> Result<(), String> {
-    eprintln!("update_source called with id={}, update={:?}", id, update);
-    
     let db_guard = db.lock().map_err(|e| format!("Database lock error: {}", e))?;
-    eprintln!("Database lock acquired");
     
     let config_json_str = update.config_json
         .as_ref()
         .map(|c| serde_json::to_string(c))
         .transpose()
         .map_err(|e| format!("Failed to serialize config: {}", e))?;
-    eprintln!("Config JSON serialized: {:?}", config_json_str);
     
     // Convert Option<Vec<i64>> to Option<Option<&[i64]>>
     // None = don't update groups, Some(vec) = set groups (empty vec clears)
     let group_ids_ref: Option<Option<&[i64]>> = update.group_ids.as_ref().map(|v| Some(v.as_slice()));
-    eprintln!("Group IDs converted: {:?}", group_ids_ref);
     
     db_guard.update_source(
         id,
@@ -155,21 +150,15 @@ pub async fn update_source(
         config_json_str.as_deref(),
         update.enabled,
         group_ids_ref,
-    ).map_err(|e| {
-        eprintln!("update_source database error: {}", e);
-        format!("Failed to update source: {}", e)
-    })?;
-    eprintln!("Database update_source completed");
+    ).map_err(|e| format!("Failed to update source: {}", e))?;
     
     // Update token if provided
     if let Some(token) = update.token {
         let token_store: State<'_, Mutex<TokenStore>> = app.state();
         let mut store = token_store.lock().map_err(|e| format!("Token store lock error: {}", e))?;
         store.insert(id, token);
-        eprintln!("Token updated");
     }
     
-    eprintln!("update_source returning Ok");
     Ok(())
 }
 

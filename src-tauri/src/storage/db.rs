@@ -201,49 +201,35 @@ impl Database {
     }
 
     pub fn update_source(&self, id: i64, name: Option<&str>, config_json: Option<&str>, enabled: Option<bool>, group_ids: Option<Option<&[i64]>>) -> Result<()> {
-        eprintln!("update_source db method called with id={}, name={:?}, enabled={:?}, group_ids={:?}", id, name, enabled, group_ids);
         let conn = self.conn.lock().unwrap();
-        eprintln!("update_source: connection lock acquired");
         let now = Utc::now().timestamp();
-        eprintln!("update_source: timestamp={}", now);
         
         if let Some(name) = name {
-            eprintln!("update_source: updating name");
             conn.execute(
                 "UPDATE sources SET name = ?1, updated_at = ?2 WHERE id = ?3",
                 params![name, now, id],
             )?;
-            eprintln!("update_source: name updated");
         }
         
         if let Some(config_json) = config_json {
-            eprintln!("update_source: updating config_json");
             conn.execute(
                 "UPDATE sources SET config_json = ?1, updated_at = ?2 WHERE id = ?3",
                 params![config_json, now, id],
             )?;
-            eprintln!("update_source: config_json updated");
         }
         
         if let Some(enabled) = enabled {
-            eprintln!("update_source: updating enabled");
             conn.execute(
                 "UPDATE sources SET enabled = ?1, updated_at = ?2 WHERE id = ?3",
                 params![if enabled { 1 } else { 0 }, now, id],
             )?;
-            eprintln!("update_source: enabled updated");
         }
         
         if let Some(group_ids) = group_ids {
-            eprintln!("update_source: updating group_ids, calling set_source_groups");
             // Update source-group relationships - pass the already-locked connection
             Self::set_source_groups_internal(&conn, id, group_ids.unwrap_or(&[]))?;
-            eprintln!("update_source: set_source_groups completed");
-        } else {
-            eprintln!("update_source: group_ids is None, skipping group update");
         }
         
-        eprintln!("update_source: all updates completed, returning Ok");
         Ok(())
     }
 
@@ -583,34 +569,23 @@ impl Database {
 
     // Internal helper that takes a connection reference (for use when connection is already locked)
     fn set_source_groups_internal(conn: &Connection, source_id: i64, group_ids: &[i64]) -> Result<()> {
-        eprintln!("set_source_groups_internal called with source_id={}, group_ids={:?}", source_id, group_ids);
-        
         // Delete existing relationships
-        eprintln!("set_source_groups_internal: deleting existing relationships");
         conn.execute(
             "DELETE FROM source_groups WHERE source_id = ?1",
             params![source_id],
         )?;
-        eprintln!("set_source_groups_internal: existing relationships deleted");
         
         // Insert new relationships
-        eprintln!("set_source_groups_internal: inserting {} new relationships", group_ids.len());
-        for (idx, group_id) in group_ids.iter().enumerate() {
-            eprintln!("set_source_groups_internal: inserting relationship {}/{}: source_id={}, group_id={}", idx + 1, group_ids.len(), source_id, group_id);
+        for group_id in group_ids {
             conn.execute(
                 "INSERT INTO source_groups (source_id, group_id) VALUES (?1, ?2)",
                 params![source_id, group_id],
             )?;
-            eprintln!("set_source_groups_internal: relationship {}/{} inserted successfully", idx + 1, group_ids.len());
         }
-        eprintln!("set_source_groups_internal: all relationships inserted, returning Ok");
+        
         Ok(())
     }
     
-    pub fn set_source_groups(&self, source_id: i64, group_ids: &[i64]) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
-        Self::set_source_groups_internal(&conn, source_id, group_ids)
-    }
 
     // Migrate existing groups from comma-separated strings to groups table
     fn migrate_existing_groups(conn: &Connection) -> Result<()> {

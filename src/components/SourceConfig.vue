@@ -627,16 +627,8 @@ const saveEdit = async (e?: Event) => {
     e.stopPropagation();
   }
   
-  console.log('saveEdit called', { savingSource: savingSource.value, editingSource: editingSource.value });
-  
-  if (savingSource.value) {
-    console.log('Already saving, returning');
-    return false;
-  }
-  if (!editingSource.value) {
-    console.log('No editing source, returning');
-    return false;
-  }
+  if (savingSource.value) return false;
+  if (!editingSource.value) return false;
   
   if (!editForm.value.name.trim()) {
     alert('Please enter a source name');
@@ -661,23 +653,16 @@ const saveEdit = async (e?: Event) => {
   
   savingSource.value = true;
   try {
-    console.log('Starting save, form data:', editForm.value);
     // Convert Proxy array to plain array to ensure proper serialization
     const groupIds = Array.isArray(editForm.value.groupIds) 
       ? [...editForm.value.groupIds] 
       : [];
     
-    console.log('Group IDs (plain array):', groupIds, 'Type:', typeof groupIds, 'IsArray:', Array.isArray(groupIds));
-    
     const update: UpdateSourceInput = {
       name: editForm.value.name,
       enabled: editForm.value.enabled,
-      // Rust expects Option<Vec<i64>>: None = don't update, Some([]) = clear, Some([1,2]) = set
-      // Always send the array (even if empty) to update groups
       group_ids: groupIds,
     };
-    
-    console.log('Update object before serialization:', JSON.stringify(update, null, 2));
     
     if (editingSource.value.source_type === 'rss') {
       update.config_json = {
@@ -695,37 +680,23 @@ const saveEdit = async (e?: Event) => {
       }
     }
     
-    console.log('Calling updateSource with:', { id: editingSource.value.id, update });
     // Update the source
-    try {
-      await updateSource(editingSource.value.id, update);
-      console.log('updateSource completed successfully');
-    } catch (updateError) {
-      console.error('updateSource threw error:', updateError);
-      throw updateError;
-    }
+    await updateSource(editingSource.value.id, update);
     
-    console.log('Refreshing data...');
     // Refresh data
     await fetchGroups();
-    console.log('fetchGroups completed');
     await fetchSources();
-    console.log('fetchSources completed');
     
-    console.log('Closing panel...');
     // Close panel only after successful update
     closeEditPanel();
-    console.log('Panel closed');
     return false;
   } catch (e) {
-    console.error('Error in saveEdit catch block:', e);
     const errorMsg = e instanceof Error ? e.message : String(e);
     alert(`Failed to update source: ${errorMsg}`);
     error.value = `Failed to update source: ${errorMsg}`;
     return false;
   } finally {
     savingSource.value = false;
-    console.log('saveEdit finally block - savingSource set to false');
   }
 };
 
@@ -889,15 +860,10 @@ const removeGroup = async (id: number) => {
   if (!confirmed) return;
   
   try {
-    console.log('removeGroup: calling removeGroupAction with id:', id);
     await removeGroupAction(id);
-    console.log('removeGroup: removeGroupAction completed');
     await fetchGroups();
-    console.log('removeGroup: fetchGroups completed');
     await fetchSources();
-    console.log('removeGroup: fetchSources completed');
   } catch (e) {
-    console.error('removeGroup: error caught:', e);
     const errorMsg = e instanceof Error ? e.message : String(e);
     alert(`Failed to remove group: ${errorMsg}`);
     error.value = `Failed to remove group: ${errorMsg}`;
