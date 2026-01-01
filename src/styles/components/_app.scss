@@ -23,9 +23,46 @@
 .app-title {
   font-size: $font-lg;
   font-weight: $font-semibold;
-  margin-bottom: $spacing-lg;
+  margin-bottom: $spacing-md;
   color: white;
   letter-spacing: -0.2px;
+}
+
+.nav-search {
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
+  margin-bottom: $spacing-md;
+  padding: $spacing-xs $spacing-sm;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: $radius-sm;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all $transition-base;
+
+  &:focus-within {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+}
+
+.nav-search-icon {
+  font-size: $font-sm;
+  color: rgba(255, 255, 255, 0.7);
+  flex-shrink: 0;
+}
+
+.nav-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: $font-sm;
+  outline: none;
+  width: 100%;
+
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+  }
 }
 
 .nav-links {
@@ -33,6 +70,28 @@
   flex-direction: column;
   gap: $spacing-xs;
   flex: 1;
+}
+
+.nav-section {
+  margin-bottom: $spacing-md;
+}
+
+.nav-section-header {
+  font-size: $font-base;
+  font-weight: $font-semibold;
+  color: rgba(255, 255, 255, 0.9);
+  padding: $spacing-xs $spacing-md;
+  margin-bottom: $spacing-xs;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: $font-xs;
+}
+
+.nav-section-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-left: $spacing-md;
 }
 
 .nav-group {
@@ -90,6 +149,31 @@
   margin-top: $spacing-xs;
 }
 
+.nav-scrollable {
+  max-height: 300px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  
+  // Custom scrollbar styling
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+    
+    &:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+  }
+}
+
 .nav-button {
   padding: $spacing-xs $spacing-md;
   background: transparent;
@@ -141,6 +225,16 @@
   }
 }
 
+.nav-source-item {
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
+
+  .nav-button {
+    flex: 1;
+  }
+}
+
 .nav-delete-button {
   padding: $spacing-xs $spacing-sm;
   background: transparent;
@@ -174,17 +268,14 @@
 
 .nav-bottom-actions {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: $spacing-xs;
   margin-top: auto;
 }
 
 .nav-bottom {
-  width: 100%;
-}
-
-.nav-add-view {
-  margin-bottom: $spacing-xs;
+  flex: 1;
+  min-width: 0;
 }
 
 .main-content {

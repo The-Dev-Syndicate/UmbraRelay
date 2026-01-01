@@ -1,13 +1,55 @@
 <template>
-  <div class="custom-view-view">
+  <div class="inbox-view">
     <div class="sticky-header">
       <div class="header-left">
-        <h1>{{ viewName }}</h1>
-        <button @click="editView" class="edit-view-button">Edit</button>
+        <h1>Today</h1>
       </div>
       <div class="header-right">
         <div class="filters-wrapper">
           <div class="filters-container">
+            <div class="filters">
+              <button
+                v-for="filter in filters"
+                :key="filter"
+                :class="{ active: currentFilter === filter }"
+                @click="setFilter(filter)"
+              >
+                {{ filter }}
+              </button>
+            </div>
+            <div class="group-filter">
+              <div class="group-filter-dropdown" :class="{ open: showGroupDropdown }">
+                <button 
+                  @click="showGroupDropdown = !showGroupDropdown" 
+                  class="group-filter-button"
+                >
+                  <span v-if="selectedGroups.length === 0">All Groups</span>
+                  <span v-else>{{ selectedGroups.length }} selected</span>
+                  <span class="dropdown-arrow">▼</span>
+                </button>
+                <div v-if="showGroupDropdown" class="group-filter-menu">
+                  <div class="group-filter-header">
+                    <span>Filter by Groups</span>
+                    <button @click="clearAllGroups" class="clear-all-btn">Clear All</button>
+                  </div>
+                  <div class="group-filter-options">
+                    <label 
+                      v-for="group in availableGroups" 
+                      :key="group" 
+                      class="group-option"
+                    >
+                      <input 
+                        type="checkbox" 
+                        :value="group"
+                        v-model="selectedGroups"
+                        @change="applyGroupFilter"
+                      />
+                      <span class="group-option-label">{{ group }}</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
             <button
               v-if="!searchExpanded"
               @click="searchExpanded = true"
@@ -42,7 +84,7 @@
     <div v-if="loading" class="loading">Loading...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <div v-else-if="filteredItems.length === 0" class="empty">
-      No items found in this view.
+      No items found.
     </div>
     <div v-else class="items-list">
       <div
@@ -90,49 +132,51 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { useItems } from '../composables/useItems';
-import { useCustomViews } from '../composables/useCustomViews';
-import type { CustomView } from '../types';
+import { useSources } from '../composables/useSources';
 import { formatDate, truncate, stripHtml, parseGroups } from '../utils/formatting';
-
-const props = defineProps<{
-  viewId: number;
-}>();
 
 const emit = defineEmits<{
   (e: 'select-item', id: number): void;
-  (e: 'edit-view'): void;
 }>();
 
 const { items, loading, error, fetchItems, updateItemState } = useItems();
-const { getCustomView } = useCustomViews();
-
-const view = ref<CustomView | null>(null);
-const viewName = computed(() => view.value?.name || 'Custom View');
+const { sources, fetchSources } = useSources();
+const currentFilter = ref<string | null>(null);
+const selectedGroups = ref<string[]>([]);
+const showGroupDropdown = ref(false);
 const searchQuery = ref('');
 const searchExpanded = ref(false);
 const searchInput = ref<HTMLInputElement | null>(null);
 
-// Parse JSON arrays from view
-const sourceIds = computed(() => {
-  if (!view.value?.source_ids) return undefined;
-  try {
-    return JSON.parse(view.value.source_ids) as number[];
-  } catch {
-    return undefined;
-  }
-});
+const filters = ['All', 'Unread', 'Read', 'Archived'];
 
-const groupNames = computed(() => {
-  if (!view.value?.group_names) return undefined;
-  try {
-    return JSON.parse(view.value.group_names) as string[];
-  } catch {
-    return undefined;
-  }
+// Calculate start of today in Unix timestamp (UTC midnight)
+const getStartOfToday = (): number => {
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.floor(startOfDay.getTime() / 1000);
+};
+
+// Get available groups from items' source_group field
+const availableGroups = computed(() => {
+  const groups = new Set<string>();
+  items.value.forEach(item => {
+    if (item.source_group) {
+      const parsed = parseGroups(item.source_group);
+      parsed.forEach(g => groups.add(g));
+    }
+  });
+  return Array.from(groups).sort();
 });
 
 const filteredItems = computed(() => {
+  const startOfToday = getStartOfToday();
   let filtered = items.value;
+  
+  // Filter items created or updated today
+  filtered = filtered.filter(item => {
+    return item.created_at >= startOfToday || item.updated_at >= startOfToday;
+  });
   
   // Apply text search filter
   if (searchQuery.value.trim()) {
@@ -150,8 +194,54 @@ const filteredItems = computed(() => {
     });
   }
   
+  // Apply state filter
+  if (currentFilter.value) {
+    filtered = filtered.filter(item => item.state === currentFilter.value);
+  }
+  
+  // Apply group filter (multi-select)
+  if (selectedGroups.value.length > 0) {
+    filtered = filtered.filter(item => {
+      if (!item.source_group) return false;
+      const itemGroups = parseGroups(item.source_group);
+      // Check if any of the selected groups match any of the item's groups
+      return selectedGroups.value.some(selectedGroup => 
+        itemGroups.includes(selectedGroup)
+      );
+    });
+  }
+  
   return filtered;
 });
+
+const setFilter = (filter: string) => {
+  const filterValue = filter === 'All' ? null : filter.toLowerCase();
+  currentFilter.value = filterValue;
+  // Fetch all items, filtering will be done in computed
+  fetchItems();
+};
+
+const applyGroupFilter = () => {
+  // Filtering is done in computed, no need to fetch again
+  // Just close dropdown after a short delay
+  setTimeout(() => {
+    if (selectedGroups.value.length === 0) {
+      showGroupDropdown.value = false;
+    }
+  }, 200);
+};
+
+const removeGroup = (group: string) => {
+  const index = selectedGroups.value.indexOf(group);
+  if (index > -1) {
+    selectedGroups.value.splice(index, 1);
+  }
+};
+
+const clearAllGroups = () => {
+  selectedGroups.value = [];
+  showGroupDropdown.value = false;
+};
 
 const selectItem = async (id: number) => {
   // Mark item as read if it's currently unread
@@ -160,10 +250,6 @@ const selectItem = async (id: number) => {
     await updateItemState(id, 'read');
   }
   emit('select-item', id);
-};
-
-const editView = () => {
-  emit('edit-view');
 };
 
 
@@ -193,13 +279,17 @@ const handleSearchBlur = (e: FocusEvent) => {
   }
 };
 
-onMounted(async () => {
-  // Load view data
-  view.value = await getCustomView(props.viewId);
+onMounted(() => {
+  fetchSources();
+  fetchItems();
   
-  // Fetch items with view filters
-  await fetchItems(undefined, undefined, sourceIds.value, groupNames.value);
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    if (!target.closest('.group-filter')) {
+      showGroupDropdown.value = false;
+    }
+  });
 });
 </script>
-
 

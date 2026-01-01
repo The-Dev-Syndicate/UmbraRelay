@@ -2,36 +2,74 @@
   <div class="app">
     <nav class="sidebar">
       <h1 class="app-title">UmbraRelay</h1>
+      
+      <!-- Search Input -->
+      <div class="nav-search">
+        <span class="nav-search-icon">🔍</span>
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Search sources and views..."
+          class="nav-search-input"
+        />
+      </div>
+
       <div class="nav-links">
-        <!-- Inbox Group -->
-        <div class="nav-group">
-          <button
-            @click="inboxExpanded = !inboxExpanded"
-            class="nav-group-header"
-          >
-            <span class="nav-icon">📥</span>
-            <span>Inbox</span>
-            <span class="nav-arrow" :class="{ expanded: inboxExpanded }">▼</span>
-          </button>
-          <div v-if="inboxExpanded" class="nav-group-items">
+        <!-- Collections Section (always visible) -->
+        <div class="nav-section">
+          <div class="nav-section-header">Collections</div>
+          <div class="nav-section-items">
             <button
-              :class="{ active: currentView === 'inbox' }"
-              @click="currentView = 'inbox'; selectedItemId = null"
+              :class="{ active: currentView === 'today' }"
+              @click="currentView = 'today'; selectedItemId = null"
               class="nav-button nav-sub-item"
             >
-              Inbox
+              <span class="nav-icon">☀️</span>
+              <span>Today</span>
             </button>
             <button
-              :class="{ active: currentView === 'leaving-soon' }"
-              @click="currentView = 'leaving-soon'; selectedItemId = null"
+              :class="{ active: currentView === 'all-items' }"
+              @click="currentView = 'all-items'; selectedItemId = null"
               class="nav-button nav-sub-item"
             >
-              Leaving Soon
+              <span class="nav-icon">📦</span>
+              <span>All Items</span>
             </button>
           </div>
         </div>
 
-        <!-- My Views Group -->
+        <!-- Sources Section (collapsible) -->
+        <div class="nav-group">
+          <button
+            @click="sourcesExpanded = !sourcesExpanded"
+            class="nav-group-header"
+          >
+            <span class="nav-icon">📡</span>
+            <span>Sources</span>
+            <span class="nav-arrow" :class="{ expanded: sourcesExpanded }">▼</span>
+          </button>
+          <div v-if="sourcesExpanded" class="nav-group-items nav-scrollable">
+            <div
+              v-for="source in filteredSources"
+              :key="source.id"
+              class="nav-source-item"
+            >
+              <button
+                :class="{ active: currentView === `source-${source.id}` }"
+                @click="currentView = `source-${source.id}`; selectedItemId = null"
+                class="nav-button nav-sub-item"
+              >
+                {{ source.name }}
+              </button>
+            </div>
+            <div v-if="filteredSources.length === 0" class="nav-empty-state">
+              <span v-if="searchQuery">No sources match</span>
+              <span v-else>No sources yet</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- My Views Group (collapsible) -->
         <div class="nav-group">
           <button
             @click="myViewsExpanded = !myViewsExpanded"
@@ -41,9 +79,9 @@
             <span>My Views</span>
             <span class="nav-arrow" :class="{ expanded: myViewsExpanded }">▼</span>
           </button>
-          <div v-if="myViewsExpanded" class="nav-group-items">
+          <div v-if="myViewsExpanded" class="nav-group-items nav-scrollable">
             <div
-              v-for="view in customViews"
+              v-for="view in filteredViews"
               :key="view.id"
               class="nav-view-item"
             >
@@ -62,18 +100,19 @@
                 ×
               </button>
             </div>
-            <div v-if="customViews.length === 0" class="nav-empty-state">
-              No custom views yet
+            <div v-if="filteredViews.length === 0" class="nav-empty-state">
+              <span v-if="searchQuery">No views match</span>
+              <span v-else>No custom views yet</span>
             </div>
           </div>
         </div>
 
-        <!-- Sources and Add View (moved to bottom) -->
+        <!-- Sources and Add View (moved to bottom, horizontal) -->
         <div class="nav-spacer"></div>
         <div class="nav-bottom-actions">
           <button
             @click="openCreateView"
-            class="nav-button nav-bottom nav-add-view"
+            class="nav-button nav-bottom"
             title="Add View"
           >
             <span class="nav-icon">➕</span>
@@ -92,13 +131,24 @@
     </nav>
 
     <main class="main-content">
-      <InboxView
-        v-if="currentView === 'inbox' && !selectedItemId"
+      <TodayView
+        v-if="currentView === 'today' && !selectedItemId"
         @select-item="selectItem"
-        key="inbox"
+        key="today"
+      />
+      <InboxView
+        v-else-if="currentView === 'all-items' && !selectedItemId"
+        @select-item="selectItem"
+        key="all-items"
+      />
+      <InboxView
+        v-else-if="currentViewType === 'source' && !selectedItemId"
+        :source-id="currentSourceId"
+        @select-item="selectItem"
+        :key="`source-${currentSourceId}`"
       />
       <ItemDetail
-        v-else-if="(currentView === 'inbox' || currentView === 'leaving-soon' || typeof currentView === 'number') && selectedItemId"
+        v-else-if="(currentView === 'today' || currentView === 'all-items' || currentViewType === 'source' || currentView === 'leaving-soon' || typeof currentView === 'number') && selectedItemId"
         :item-id="selectedItemId"
         @back="selectedItemId = null"
         key="item-detail"
@@ -131,8 +181,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import InboxView from './components/InboxView.vue';
+import TodayView from './components/TodayView.vue';
 import LeavingSoonView from './components/LeavingSoonView.vue';
 import CustomViewView from './components/CustomViewView.vue';
 import CustomViewConfig from './components/CustomViewConfig.vue';
@@ -140,19 +191,61 @@ import ItemDetail from './components/ItemDetail.vue';
 import SourceConfig from './components/SourceConfig.vue';
 import LinkHoverPreview from './components/LinkHoverPreview.vue';
 import { useCustomViews } from './composables/useCustomViews';
+import { useSources } from './composables/useSources';
 import { useTheme } from './composables/useTheme';
 
 // Initialize theme system
 useTheme();
 
-const currentView = ref<'inbox' | 'leaving-soon' | 'sources' | number>('inbox');
+type ViewType = 'today' | 'all-items' | 'leaving-soon' | 'sources' | number | string;
+
+const currentView = ref<ViewType>('today');
 const selectedItemId = ref<number | null>(null);
-const inboxExpanded = ref(false);
+const sourcesExpanded = ref(false);
 const myViewsExpanded = ref(false);
 const showViewConfig = ref(false);
 const editingViewId = ref<number | null>(null);
+const searchQuery = ref('');
 
 const { customViews, fetchCustomViews, deleteCustomView } = useCustomViews();
+const { sources, fetchSources } = useSources();
+
+// Parse current view to determine if it's a source view
+const currentViewType = computed(() => {
+  if (typeof currentView.value === 'string' && currentView.value.startsWith('source-')) {
+    return 'source';
+  }
+  return null;
+});
+
+const currentSourceId = computed(() => {
+  if (currentViewType.value === 'source') {
+    const match = (currentView.value as string).match(/^source-(\d+)$/);
+    return match ? parseInt(match[1], 10) : null;
+  }
+  return null;
+});
+
+// Filter sources and views based on search query
+const filteredSources = computed(() => {
+  if (!searchQuery.value.trim()) {
+    return sources.value;
+  }
+  const query = searchQuery.value.toLowerCase();
+  return sources.value.filter(source => 
+    source.name.toLowerCase().includes(query)
+  );
+});
+
+const filteredViews = computed(() => {
+  if (!searchQuery.value.trim()) {
+    return customViews.value;
+  }
+  const query = searchQuery.value.toLowerCase();
+  return customViews.value.filter(view => 
+    view.name.toLowerCase().includes(query)
+  );
+});
 
 const selectItem = (id: number) => {
   selectedItemId.value = id;
@@ -182,9 +275,9 @@ const deleteView = async (id: number) => {
   if (confirm('Are you sure you want to delete this view? This will not delete any items.')) {
     try {
       await deleteCustomView(id);
-      // If we're currently viewing this view, switch to inbox
+      // If we're currently viewing this view, switch to today
       if (currentView.value === id) {
-        currentView.value = 'inbox';
+        currentView.value = 'today';
         selectedItemId.value = null;
       }
     } catch (e) {
@@ -196,6 +289,7 @@ const deleteView = async (id: number) => {
 onMounted(() => {
   console.log('UmbraRelay app mounted');
   fetchCustomViews();
+  fetchSources();
 });
 </script>
 
