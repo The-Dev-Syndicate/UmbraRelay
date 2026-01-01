@@ -4736,6 +4736,7 @@ name = "umbra-relay"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "atom_syndication",
  "chrono",
  "regex",
  "reqwest",

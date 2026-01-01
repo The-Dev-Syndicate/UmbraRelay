@@ -1,6 +1,6 @@
 use crate::storage::{Database, models::{Item, CustomView, Group}};
 use crate::config::TokenStore;
-use crate::ingestion::{RssIngester, GitHubIngester, traits::IngestSource};
+use crate::ingestion::{RssIngester, AtomIngester, GitHubIngester, traits::IngestSource};
 use crate::normalization::normalize_and_dedupe;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -122,6 +122,33 @@ pub async fn add_source(
     
     drop(db_guard);
     
+    // Immediately sync the newly added source
+    let app_handle = app.clone();
+    let source_id_for_sync = source_id;
+    tauri::async_runtime::spawn(async move {
+        // Wait a moment to ensure the source is fully created
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        
+        // Get the source we just created
+        let db_state: State<'_, Mutex<Database>> = app_handle.state();
+        let source = {
+            let db_guard = match db_state.lock() {
+                Ok(db) => db,
+                Err(_) => return,
+            };
+            match db_guard.get_source(source_id_for_sync) {
+                Ok(s) => s,
+                Err(_) => return,
+            }
+        };
+        
+        // Sync the source
+        use crate::sync_source_internal;
+        if let Err(e) = sync_source_internal(&app_handle, source).await {
+            eprintln!("Failed to sync newly added source {}: {}", source_id_for_sync, e);
+        }
+    });
+    
     Ok(source_id)
 }
 
@@ -210,6 +237,21 @@ pub async fn sync_source(
                     .map_err(|e| format!("Failed to create RSS ingester: {}", e))?;
                 ingester.poll()
                     .map_err(|e| format!("Failed to poll RSS feed: {}", e))
+            })
+            .await
+            .map_err(|e| format!("Task join error: {}", e))?
+        }
+        "atom" => {
+            let url = config.get("url")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| "Missing ATOM URL in config".to_string())?;
+            
+            let url = url.to_string();
+            tokio::task::spawn_blocking(move || {
+                let ingester = AtomIngester::new(url)
+                    .map_err(|e| format!("Failed to create ATOM ingester: {}", e))?;
+                ingester.poll()
+                    .map_err(|e| format!("Failed to poll ATOM feed: {}", e))
             })
             .await
             .map_err(|e| format!("Task join error: {}", e))?

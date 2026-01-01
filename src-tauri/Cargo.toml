@@ -29,6 +29,7 @@ rusqlite_migration = "2.3"
 tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.12", features = ["json", "blocking"] }
 rss = "2.0"
+atom_syndication = "0.12"
 toml = "0.8"
 chrono = { version = "0.4", features = ["serde"] }
 anyhow = "1.0"

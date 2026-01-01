@@ -41,6 +41,30 @@ pub fn run() {
                 background_polling_service(app_handle).await;
             });
             
+            // Sync all enabled sources on app startup
+            let app_handle_sync = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                // Wait a moment for the app to fully initialize
+                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+                
+                // Get all enabled sources and sync them
+                let sources = match get_sources_sync(&app_handle_sync) {
+                    Ok(sources) => sources.into_iter().filter(|s| s.enabled).collect::<Vec<_>>(),
+                    Err(e) => {
+                        eprintln!("Failed to get sources for initial sync: {}", e);
+                        return;
+                    }
+                };
+                
+                // Sync each enabled source
+                for source in sources {
+                    let result = sync_source_internal(&app_handle_sync, source).await;
+                    if let Err(e) = result {
+                        eprintln!("Failed to sync source during startup: {}", e);
+                    }
+                }
+            });
+            
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -135,7 +159,7 @@ async fn background_polling_service(app: tauri::AppHandle) {
             
             // Determine poll interval
             let poll_interval = match source.source_type.as_str() {
-                "rss" => {
+                "rss" | "atom" => {
                     let config_json: serde_json::Value = serde_json::from_str(&source.config_json)
                         .unwrap_or_default();
                     config_json.get("poll_interval")
@@ -182,8 +206,8 @@ async fn background_polling_service(app: tauri::AppHandle) {
     }
 }
 
-async fn sync_source_internal(app: &tauri::AppHandle, source: storage::models::Source) -> anyhow::Result<()> {
-    use crate::ingestion::{RssIngester, GitHubIngester, traits::IngestSource};
+pub async fn sync_source_internal(app: &tauri::AppHandle, source: storage::models::Source) -> anyhow::Result<()> {
+    use crate::ingestion::{RssIngester, AtomIngester, GitHubIngester, traits::IngestSource};
     use crate::normalization::normalize_and_dedupe;
     use anyhow::Context;
     
@@ -200,6 +224,19 @@ async fn sync_source_internal(app: &tauri::AppHandle, source: storage::models::S
             
             tokio::task::spawn_blocking(move || {
                 let ingester = RssIngester::new(url)?;
+                ingester.poll()
+            })
+            .await
+            .map_err(|e| anyhow::anyhow!("Task join error: {}", e))?
+        }
+        "atom" => {
+            let url = config.get("url")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Missing ATOM URL in config"))?
+                .to_string();
+            
+            tokio::task::spawn_blocking(move || {
+                let ingester = AtomIngester::new(url)?;
                 ingester.poll()
             })
             .await

@@ -209,6 +209,12 @@
           RSS Feed
         </button>
         <button
+          :class="{ active: newSourceType === 'atom' }"
+          @click="newSourceType = 'atom'"
+        >
+          ATOM Feed
+        </button>
+        <button
           :class="{ active: newSourceType === 'github' }"
           @click="newSourceType = 'github'"
         >
@@ -253,6 +259,46 @@
             <div class="form-actions">
               <button type="button" @click="closeAddSourceModal" class="cancel-button">Cancel</button>
         <button type="submit" class="submit-button">Add RSS Feed</button>
+            </div>
+      </form>
+
+          <!-- ATOM Form -->
+          <form v-if="newSourceType === 'atom'" @submit.prevent="addAtomSource" class="source-form" novalidate>
+        <div class="form-group">
+          <label>Name</label>
+          <input v-model="atomForm.name" type="text" required placeholder="e.g., Example Blog" />
+        </div>
+        <div class="form-group">
+          <label>URL</label>
+          <input v-model="atomForm.url" type="url" required placeholder="https://example.com/atom.xml" />
+        </div>
+        <div class="form-group">
+          <label>Poll Interval (optional)</label>
+          <input v-model="atomForm.pollInterval" type="text" placeholder="10m" />
+        </div>
+        <div class="form-group">
+              <label>Groups (optional)</label>
+              <div class="checkbox-group">
+                <label 
+                  v-for="group in groups" 
+                  :key="group.id"
+                  class="checkbox-option"
+                >
+            <input 
+                    type="checkbox" 
+                    :value="group.id"
+                    v-model="atomForm.groupIds"
+                  />
+                  <span>{{ group.name }}</span>
+                </label>
+                <p v-if="groups.length === 0" class="no-groups-hint">
+                  No groups available. Create a group in the Group Management section.
+                </p>
+          </div>
+        </div>
+            <div class="form-actions">
+              <button type="button" @click="closeAddSourceModal" class="cancel-button">Cancel</button>
+        <button type="submit" class="submit-button">Add ATOM Feed</button>
             </div>
       </form>
 
@@ -320,6 +366,83 @@
         <div class="edit-panel-content">
           <!-- RSS Edit Form -->
           <form v-if="editingSource && editingSource.source_type === 'rss'" @submit.prevent="saveEdit" class="source-form" novalidate>
+            <div class="form-group">
+              <label>Name</label>
+              <input v-model="editForm.name" type="text" required placeholder="e.g., Hacker News" />
+            </div>
+            <div class="form-group">
+              <label>URL</label>
+              <input v-model="editForm.url" type="url" required placeholder="https://example.com/feed.xml" />
+            </div>
+            <div class="form-group">
+              <label>Poll Interval (optional)</label>
+              <input v-model="editForm.pollInterval" type="text" placeholder="10m" />
+            </div>
+            <div class="form-group">
+              <label>Groups (optional)</label>
+              <div class="checkbox-group">
+                <label 
+                  v-for="group in groups" 
+                  :key="group.id"
+                  class="checkbox-option"
+                >
+                  <input 
+                    type="checkbox" 
+                    :value="group.id"
+                    v-model="editForm.groupIds"
+                  />
+                  <span>{{ group.name }}</span>
+                </label>
+                <p v-if="groups.length === 0" class="no-groups-hint">
+                  No groups available. Create a group in the Group Management section.
+                </p>
+                </div>
+              <div style="margin-top: 12px;">
+                <label style="font-size: 14px; color: #666; margin-bottom: 4px; display: block;">Create New Groups</label>
+                <input 
+                  v-model="editForm.newGroupsInput" 
+                  type="text" 
+                  placeholder="Type group name and press comma to add"
+                  @keydown="handleNewGroupKeydown('edit', $event)"
+                  @blur="handleNewGroupBlur('edit')"
+                  style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;"
+                />
+                <div v-if="editForm.newGroups.length > 0" style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px;">
+                  <span 
+                    v-for="(groupName, index) in editForm.newGroups"
+                    :key="index" 
+                    style="display: inline-flex; align-items: center; gap: 6px; background: #e3f2fd; color: #1976d2; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;"
+                  >
+                    {{ groupName }}
+                    <button 
+                      type="button"
+                      @click="removeNewGroup('edit', index)"
+                      style="background: none; border: none; color: #1976d2; cursor: pointer; padding: 0; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; font-size: 16px; line-height: 1;"
+                      title="Remove"
+                    >
+                      ×
+                    </button>
+                  </span>
+                </div>
+                <small style="color: #666; font-size: 12px; margin-top: 4px; display: block;">
+                  Type a group name and press comma to add it. Groups will be created when you save.
+                </small>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>
+                <input v-model="editForm.enabled" type="checkbox" />
+                Enabled
+              </label>
+            </div>
+            <div class="form-actions">
+              <button type="button" @click="closeEditPanel" class="cancel-button">Cancel</button>
+              <button type="submit" @click.prevent="saveEdit" class="submit-button">Save Changes</button>
+            </div>
+          </form>
+
+          <!-- ATOM Edit Form -->
+          <form v-if="editingSource && editingSource.source_type === 'atom'" @submit.prevent="saveEdit" class="source-form" novalidate>
             <div class="form-group">
               <label>Name</label>
               <input v-model="editForm.name" type="text" required placeholder="e.g., Hacker News" />
@@ -592,9 +715,16 @@ const savingGroup = ref(false);
 const savingSource = ref(false);
 const addingSource = ref(false);
 
-const newSourceType = ref<'rss' | 'github'>('rss');
+const newSourceType = ref<'rss' | 'atom' | 'github'>('rss');
 
 const rssForm = ref({
+  name: '',
+  url: '',
+  pollInterval: '10m',
+  groupIds: [] as number[],
+});
+
+const atomForm = ref({
   name: '',
   url: '',
   pollInterval: '10m',
@@ -697,6 +827,52 @@ const addRssSource = async (e?: Event) => {
   }
 };
 
+const addAtomSource = async (e?: Event) => {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  
+  if (addingSource.value) return false;
+  
+  if (!atomForm.value.name.trim()) {
+    alert('Please enter a source name');
+    return false;
+  }
+  if (!atomForm.value.url.trim()) {
+    alert('Please enter a URL');
+    return false;
+  }
+  
+  addingSource.value = true;
+  try {
+  const source: SourceInput = {
+    source_type: 'atom',
+    name: atomForm.value.name,
+    config_json: {
+      url: atomForm.value.url,
+      poll_interval: atomForm.value.pollInterval || '10m',
+    },
+      group_ids: atomForm.value.groupIds.length > 0 ? atomForm.value.groupIds : null,
+  };
+
+  await addSource(source);
+    await fetchGroups();
+    await fetchSources();
+    closeAddSourceModal();
+  
+  // Reset form
+    atomForm.value = { name: '', url: '', pollInterval: '10m', groupIds: [] };
+    return false;
+  } catch (e) {
+    const errorMsg = e instanceof Error ? e.message : String(e);
+    alert(`Failed to add source: ${errorMsg}`);
+    return false;
+  } finally {
+    addingSource.value = false;
+  }
+};
+
 const addGitHubSource = async (e?: Event) => {
   if (e) {
     e.preventDefault();
@@ -772,7 +948,7 @@ const editSource = (source: Source) => {
   editForm.value.newGroupsInput = '';
   editForm.value.newGroups = [];
   
-  if (source.source_type === 'rss') {
+  if (source.source_type === 'rss' || source.source_type === 'atom') {
     editForm.value.url = config.url || '';
     editForm.value.pollInterval = config.poll_interval || '10m';
   } else if (source.source_type === 'github') {
@@ -814,7 +990,7 @@ const saveEdit = async (e?: Event) => {
     return false;
   }
   
-  if (editingSource.value.source_type === 'rss' && !editForm.value.url.trim()) {
+  if ((editingSource.value.source_type === 'rss' || editingSource.value.source_type === 'atom') && !editForm.value.url.trim()) {
     alert('Please enter a URL');
     return false;
   }
@@ -864,7 +1040,7 @@ const saveEdit = async (e?: Event) => {
       group_ids: groupIds,
     };
     
-    if (editingSource.value.source_type === 'rss') {
+    if (editingSource.value.source_type === 'rss' || editingSource.value.source_type === 'atom') {
       update.config_json = {
         url: editForm.value.url,
         poll_interval: editForm.value.pollInterval || '10m',
