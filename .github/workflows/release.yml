@@ -13,7 +13,7 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     outputs:
-      release_id: ${{ steps.get_release_id.outputs.id }}
+      release_id: ${{ steps.create_release.outputs.id }}
     steps:
       - uses: actions/checkout@v4
       - name: setup node
@@ -40,92 +40,78 @@ jobs:
           else
             echo "has_changelog=false" >> $GITHUB_OUTPUT
           fi
-      - name: create release
-        id: release_creation
-        uses: softprops/action-gh-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: UmbraRelay ${{ github.ref_name }}
-          draft: true
-          prerelease: false
-          generate_release_notes: ${{ steps.changelog.outputs.has_changelog != 'true' }}
-          body_path: ${{ steps.changelog.outputs.has_changelog == 'true' && 'changelog_section.md' || '' }}
-      - name: verify release creation succeeded
+      - name: create release and get ID
+        id: create_release
         run: |
-          if [ "${{ steps.release_creation.outcome }}" != "success" ]; then
-            echo "❌ Release creation step failed!"
-            echo "This may indicate a permissions issue or API problem."
-            exit 1
-          fi
-          echo "✓ Release creation step completed successfully"
-        continue-on-error: false
-      - name: get release id
-        id: get_release_id
-        run: |
-          echo "Repository: ${{ github.repository }}"
-          echo "Tag: ${{ github.ref_name }}"
-          # Wait a moment for the release to be fully created and propagated
-          echo "Waiting for release to be fully created..."
-          sleep 5
-          # Retry getting the release ID with exponential backoff
-          for i in {1..15}; do
-            echo ""
-            echo "Attempt $i: Fetching release ID..."
-            # Try to get release by tag
-            RELEASE_RESPONSE=$(gh api repos/${{ github.repository }}/releases/tags/${{ github.ref_name }} --jq '{id: .id, name: .name, draft: .draft}' 2>&1)
-            EXIT_CODE=$?
-            
-            if [ $EXIT_CODE -eq 0 ]; then
-              RELEASE_ID=$(echo "$RELEASE_RESPONSE" | jq -r '.id // empty' 2>/dev/null || echo "")
-              if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "null" ] && [ "$RELEASE_ID" != "" ]; then
-                echo "id=$RELEASE_ID" >> $GITHUB_OUTPUT
-                echo "✓ Release ID found: $RELEASE_ID"
-                echo "Release details: $RELEASE_RESPONSE"
-                exit 0
-              else
-                echo "Release response received but ID is empty: $RELEASE_RESPONSE"
-              fi
-            else
-              echo "API call failed (exit code: $EXIT_CODE)"
-              echo "Response: $RELEASE_RESPONSE"
-              
-              # Try alternative: list all releases and find by tag
-              echo "Trying alternative method: listing all releases..."
-              TAG_NAME="${{ github.ref_name }}"
-              ALL_RELEASES=$(gh api repos/${{ github.repository }}/releases --jq ".[] | select(.tag_name == \"$TAG_NAME\") | .id" 2>/dev/null || echo "")
-              if [ -n "$ALL_RELEASES" ] && [ "$ALL_RELEASES" != "null" ] && [ "$ALL_RELEASES" != "" ]; then
-                echo "id=$ALL_RELEASES" >> $GITHUB_OUTPUT
-                echo "✓ Release ID found via alternative method: $ALL_RELEASES"
-                exit 0
-              fi
-            fi
-            
-            if [ $i -lt 15 ]; then
-              WAIT_TIME=$((i * 2))
-              echo "Waiting ${WAIT_TIME}s before retry..."
-              sleep $WAIT_TIME
-            fi
-          done
+          TAG_NAME="${{ github.ref_name }}"
+          RELEASE_NAME="UmbraRelay ${{ github.ref_name }}"
           
-          echo ""
-          echo "❌ Error: Failed to get release ID after 15 attempts"
-          echo ""
-          echo "Debugging information:"
-          echo "Repository: ${{ github.repository }}"
-          echo "Tag: ${{ github.ref_name }}"
-          echo ""
-          echo "Listing all releases for debugging:"
-          gh api repos/${{ github.repository }}/releases --jq '.[] | "\(.tag_name): \(.id) (draft: \(.draft))"' || echo "Failed to list releases"
-          echo ""
-          echo "Checking if tag exists:"
-          gh api repos/${{ github.repository }}/git/refs/tags/${{ github.ref_name }} || echo "Tag not found"
-          echo ""
-          echo "Note: The release may still have been created. Check the Releases page manually."
-          echo "The build jobs will continue but may not attach artifacts automatically."
-          # Don't fail the job - let builds continue
-          echo "id=0" >> $GITHUB_OUTPUT
+          # Prepare release body
+          if [ "${{ steps.changelog.outputs.has_changelog }}" = "true" ] && [ -f changelog_section.md ]; then
+            # Use changelog content - gh api will handle JSON encoding
+            echo "Using changelog content for release body"
+            BODY_FILE="changelog_section.md"
+            USE_BODY=true
+          else
+            # Will use auto-generated notes
+            echo "Will use auto-generated release notes"
+            USE_BODY=false
+          fi
+          
+          # Create release via API and get ID immediately from response
+          echo "Creating release: $RELEASE_NAME for tag: $TAG_NAME"
+          
+          if [ "$USE_BODY" = "true" ]; then
+            # Create release with body from file
+            RESPONSE=$(gh api repos/${{ github.repository }}/releases \
+              -X POST \
+              -f tag_name="$TAG_NAME" \
+              -f name="$RELEASE_NAME" \
+              -f draft=true \
+              -f prerelease=false \
+              -F "body=@$BODY_FILE" \
+              --jq '{id: .id, url: .html_url, tag_name: .tag_name}' 2>&1)
+          else
+            # Create release with auto-generated notes
+            RESPONSE=$(gh api repos/${{ github.repository }}/releases \
+              -X POST \
+              -f tag_name="$TAG_NAME" \
+              -f name="$RELEASE_NAME" \
+              -f draft=true \
+              -f prerelease=false \
+              -f generate_release_notes=true \
+              --jq '{id: .id, url: .html_url, tag_name: .tag_name}' 2>&1)
+          fi
+          
+          EXIT_CODE=$?
+          
+          if [ $EXIT_CODE -eq 0 ]; then
+            RELEASE_ID=$(echo "$RESPONSE" | jq -r '.id // empty' 2>/dev/null || echo "")
+            if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "null" ] && [ "$RELEASE_ID" != "" ]; then
+              echo "id=$RELEASE_ID" >> $GITHUB_OUTPUT
+              echo "✓ Release created successfully!"
+              echo "Release ID: $RELEASE_ID"
+              echo "Release details: $RESPONSE"
+            else
+              echo "❌ Failed to extract release ID from response"
+              echo "Response: $RESPONSE"
+              exit 1
+            fi
+          else
+            echo "❌ Failed to create release"
+            echo "Exit code: $EXIT_CODE"
+            echo "Response: $RESPONSE"
+            
+            # Check if release already exists (maybe from a previous failed run)
+            echo "Checking if release already exists..."
+            EXISTING=$(gh api repos/${{ github.repository }}/releases/tags/$TAG_NAME --jq .id 2>/dev/null || echo "")
+            if [ -n "$EXISTING" ] && [ "$EXISTING" != "null" ]; then
+              echo "Release already exists with ID: $EXISTING"
+              echo "id=$EXISTING" >> $GITHUB_OUTPUT
+            else
+              exit 1
+            fi
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
