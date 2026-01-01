@@ -1,0 +1,360 @@
+// Shared Component Styles
+// Used across multiple components
+@use '../variables' as *;
+@use '../mixins' as *;
+
+// Item Card Styles (shared by InboxView, CustomViewView, LeavingSoonView)
+.item-card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: $radius-md;
+  padding: $spacing-lg; // 16px - more compact
+  box-shadow: $shadow-sm;
+  transition: all $transition-base;
+  cursor: pointer;
+  
+  @include card-hover;
+
+  &.unread {
+    border-left: 3px solid var(--color-primary);
+    background: var(--color-bg-unread);
+  }
+
+  &.read {
+    opacity: 0.9;
+  }
+
+  &.archived {
+    opacity: 0.7;
+  }
+}
+
+.item-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $spacing-sm;
+  padding-bottom: $spacing-xs;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.item-source-name {
+  font-size: $font-sm;
+  font-weight: $font-medium;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.item-content {
+  flex: 1;
+}
+
+.item-content-wrapper {
+  display: flex;
+  gap: $spacing-md;
+  align-items: flex-start;
+}
+
+.item-image-container {
+  flex-shrink: 0;
+  width: 100px;
+  height: 70px;
+  overflow: hidden;
+  border-radius: $radius-sm;
+  background: var(--color-bg-secondary);
+}
+
+.item-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.item-text-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.item-badges {
+  display: flex;
+  gap: $spacing-sm;
+  align-items: center;
+}
+
+.item-type-badge {
+  font-size: $font-xs;
+  font-weight: $font-medium;
+  text-transform: uppercase;
+  padding: 2px $spacing-xs;
+  border-radius: $radius-sm;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  letter-spacing: 0.3px;
+}
+
+.item-state-badge {
+  font-size: $font-xs;
+  font-weight: $font-medium;
+  text-transform: uppercase;
+  padding: 2px $spacing-xs;
+  border-radius: $radius-sm;
+  letter-spacing: 0.3px;
+
+  &.unread {
+    background: var(--color-badge-unread);
+    color: var(--color-badge-unread-text);
+  }
+
+  &.read {
+    background: var(--color-badge-read);
+    color: var(--color-badge-read-text);
+  }
+
+  &.archived {
+    background: var(--color-badge-archived);
+    color: var(--color-badge-archived-text);
+  }
+}
+
+.item-title {
+  margin: 0 0 $spacing-xs 0;
+  font-size: $font-lg;
+  font-weight: $font-semibold;
+  line-height: 1.3;
+  color: var(--color-text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.item-summary {
+  margin: 0 0 $spacing-sm 0;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  font-size: $font-sm;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.item-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: $font-sm;
+  color: var(--color-text-muted);
+  margin-top: $spacing-sm;
+  padding-top: $spacing-sm;
+  border-top: 1px solid var(--color-border-light);
+}
+
+.item-date {
+  flex-shrink: 0;
+}
+
+.item-groups {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.group-tag {
+  background: var(--color-group-tag);
+  color: var(--color-group-tag-text);
+  padding: 2px $spacing-xs;
+  border-radius: 10px;
+  font-size: $font-xs;
+  font-weight: $font-medium;
+}
+
+// Shared Button Styles
+.action-button {
+  @include button-secondary;
+
+  &.primary {
+    @include button-primary;
+  }
+}
+
+// Shared Loading/Error/Empty States
+.loading,
+.error,
+.empty {
+  text-align: center;
+  padding: $spacing-3xl;
+  color: var(--color-text-secondary);
+}
+
+.error {
+  color: var(--color-error);
+}
+
+// Shared Form Styles
+.form-group {
+  margin-bottom: $spacing-lg;
+
+  label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: $font-medium;
+  }
+
+  input[type="text"],
+  input[type="url"],
+  input[type="password"] {
+    width: 100%;
+    padding: $spacing-sm $spacing-md;
+    border: 1px solid var(--color-border);
+    border-radius: $radius-sm;
+    font-size: $font-md;
+    box-sizing: border-box;
+    background: var(--color-bg-primary);
+    color: var(--color-text-primary);
+
+    &:focus {
+      outline: none;
+      border-color: var(--color-primary);
+    }
+  }
+
+  input[type="checkbox"] {
+    margin-right: $spacing-sm;
+  }
+}
+
+.checkbox-group {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: $spacing-sm;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: $spacing-sm;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-sm;
+  background: var(--color-bg-secondary);
+
+  @media (max-width: 768px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.checkbox-option {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  cursor: pointer;
+  padding: $spacing-xs;
+
+  &:hover {
+    background: var(--color-bg-hover);
+    border-radius: $radius-sm;
+  }
+}
+
+.no-groups-hint {
+  font-size: $font-base;
+  color: var(--color-text-secondary);
+  font-style: italic;
+  margin: 0;
+  padding: $spacing-sm;
+}
+
+.form-actions {
+  display: flex;
+  gap: $spacing-md;
+  margin-top: $spacing-2xl;
+  padding-top: $spacing-xl;
+  border-top: 1px solid var(--color-border-light);
+}
+
+.cancel-button {
+  flex: 1;
+  padding: $spacing-md $spacing-2xl;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  border-radius: $radius-sm;
+  cursor: pointer;
+  font-size: $font-lg;
+  transition: all $transition-base;
+
+  &:hover {
+    background: var(--color-bg-hover);
+    border-color: var(--color-border-hover);
+  }
+}
+
+.submit-button {
+  flex: 1;
+  padding: $spacing-md $spacing-2xl;
+  font-weight: $font-medium;
+  @include button-primary;
+}
+
+// Shared Modal/Panel Styles
+.edit-panel-overlay {
+  @include modal-overlay;
+}
+
+.edit-panel {
+  @include modal-panel;
+}
+
+.edit-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: $spacing-xl;
+  border-bottom: 1px solid var(--color-border-light);
+  background: var(--color-bg-panel);
+  position: relative;
+
+  h2 {
+    margin: 0;
+    font-size: $font-2xl;
+    font-weight: $font-semibold;
+    flex: 1;
+  }
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 32px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: $radius-sm;
+  transition: all $transition-base;
+  position: absolute;
+  top: $spacing-xl;
+  right: $spacing-xl;
+
+  &:hover {
+    background: var(--color-bg-hover);
+    color: var(--color-text-primary);
+  }
+}
+
+.edit-panel-content {
+  padding: $spacing-xl;
+  flex: 1;
+  overflow-y: auto;
+}
+

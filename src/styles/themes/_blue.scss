@@ -1,0 +1,53 @@
+// Blue Theme Variables
+
+:root.theme-blue {
+  // Primary colors
+  --color-primary: #2196f3;
+  --color-primary-hover: #1976d2;
+  --color-primary-text: #ffffff;
+  
+  // Background colors
+  --color-bg-primary: #f5f7fa;
+  --color-bg-secondary: #e8ecf1;
+  --color-bg-card: #ffffff;
+  --color-bg-hover: #e3e8ed;
+  --color-bg-panel: #f0f4f8;
+  --color-bg-unread: #e8f4fd;
+  
+  // Text colors
+  --color-text-primary: #1a2332;
+  --color-text-secondary: #5a6b7a;
+  --color-text-muted: #8a9baa;
+  --color-text-inverse: #ffffff;
+  
+  // Border colors
+  --color-border: #c8d4e0;
+  --color-border-hover: #a8b8c8;
+  --color-border-light: #e0e8f0;
+  
+  // Shadow colors
+  --color-shadow: rgba(33, 150, 243, 0.15);
+  
+  // State colors
+  --color-success: #4caf50;
+  --color-success-bg: #e8f5e9;
+  --color-error: #f44336;
+  --color-error-bg: #ffebee;
+  --color-warning: #ff9800;
+  --color-warning-bg: #fff3e0;
+  --color-info: #2196f3;
+  --color-info-bg: #e3f2fd;
+  
+  // Badge colors
+  --color-badge-unread: #e3f2fd;
+  --color-badge-unread-text: #1976d2;
+  --color-badge-read: #e8f5e9;
+  --color-badge-read-text: #388e3c;
+  --color-badge-archived: #eceff1;
+  --color-badge-archived-text: #78909c;
+  
+  // Group tag colors
+  --color-group-tag: #e3f2fd;
+  --color-group-tag-text: #1976d2;
+}
+

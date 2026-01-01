@@ -1,0 +1,34 @@
+// CustomViewView Component Styles
+@use '../variables' as *;
+@use '../mixins' as *;
+
+.custom-view-view {
+  padding: $spacing-lg;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $spacing-lg;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: $font-xl;
+  font-weight: $font-semibold;
+  letter-spacing: -0.3px;
+}
+
+.edit-view-button {
+  @include button-secondary;
+}
+

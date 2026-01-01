@@ -1,0 +1,82 @@
+// LeavingSoonView Component Styles
+@use '../variables' as *;
+
+.leaving-soon-view {
+  padding: $spacing-lg;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header {
+  margin-bottom: $spacing-lg;
+
+  h1 {
+    margin: 0 0 $spacing-xs 0;
+    font-size: $font-xl;
+    font-weight: $font-semibold;
+    letter-spacing: -0.3px;
+  }
+}
+
+.subtitle {
+  color: var(--color-text-secondary);
+  font-size: $font-md;
+  margin: 0;
+}
+
+.item-footer {
+  gap: $spacing-md;
+}
+
+.days-until-removal {
+  flex: 1;
+  text-align: center;
+  padding: 6px $spacing-md;
+  border-radius: 16px;
+  font-weight: $font-semibold;
+  font-size: $font-sm;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+
+  // Color coding for days until removal
+  &.days-7 {
+    background: #4caf50;
+    color: white;
+  }
+
+  &.days-6 {
+    background: #66bb6a;
+    color: white;
+  }
+
+  &.days-5 {
+    background: #2196f3;
+    color: white;
+  }
+
+  &.days-4 {
+    background: #64b5f6;
+    color: white;
+  }
+
+  &.days-3 {
+    background: #ff9800;
+    color: white;
+  }
+
+  &.days-2 {
+    background: #f57c00;
+    color: white;
+  }
+
+  &.days-1 {
+    background: #f44336;
+    color: white;
+  }
+
+  &.days-0 {
+    background: #d32f2f;
+    color: white;
+  }
+}
+

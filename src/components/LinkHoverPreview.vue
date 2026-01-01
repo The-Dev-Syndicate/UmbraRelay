@@ -74,41 +74,4 @@ onUnmounted(() => {
 });
 </script>
 
-<style scoped>
-.link-preview {
-  position: fixed;
-  bottom: 20px;
-  left: 20px;
-  z-index: 1000;
-  pointer-events: none;
-}
-
-.link-preview-content {
-  background: rgba(0, 0, 0, 0.85);
-  color: white;
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  max-width: 600px;
-  word-break: break-all;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(10px);
-}
-
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease, transform 0.3s ease;
-}
-
-.fade-enter-from {
-  opacity: 0;
-  transform: translateY(10px);
-}
-
-.fade-leave-to {
-  opacity: 0;
-  transform: translateY(10px);
-}
-</style>
 

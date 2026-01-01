@@ -1,0 +1,39 @@
+// LinkHoverPreview Component Styles
+@use '../variables' as *;
+
+.link-preview {
+  position: fixed;
+  bottom: $spacing-xl;
+  left: $spacing-xl;
+  z-index: $z-dropdown;
+  pointer-events: none;
+}
+
+.link-preview-content {
+  background: rgba(0, 0, 0, 0.85);
+  color: white;
+  padding: $spacing-sm $spacing-md;
+  border-radius: 6px;
+  font-size: $font-base;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  max-width: 600px;
+  word-break: break-all;
+  box-shadow: $shadow-md;
+  backdrop-filter: blur(10px);
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity $transition-slow ease, transform $transition-slow ease;
+}
+
+.fade-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
+

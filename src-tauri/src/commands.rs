@@ -416,4 +416,25 @@ pub async fn sync_all_sources(
     Ok(())
 }
 
+#[tauri::command]
+pub async fn get_user_preference(
+    db: State<'_, Mutex<Database>>,
+    key: String,
+) -> Result<Option<String>, String> {
+    let db_guard = db.lock().map_err(|e| format!("Database lock error: {}", e))?;
+    db_guard.get_user_preference(&key)
+        .map_err(|e| format!("Failed to get user preference: {}", e))
+}
+
+#[tauri::command]
+pub async fn set_user_preference(
+    db: State<'_, Mutex<Database>>,
+    key: String,
+    value: String,
+) -> Result<(), String> {
+    let db_guard = db.lock().map_err(|e| format!("Database lock error: {}", e))?;
+    db_guard.set_user_preference(&key, &value)
+        .map_err(|e| format!("Failed to set user preference: {}", e))
+}
+
 

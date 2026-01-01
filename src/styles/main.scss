@@ -1,0 +1,43 @@
+// Main SCSS Entry Point
+// Uses modern @use syntax instead of deprecated @import
+
+@use 'variables' as *;
+@use 'mixins' as *;
+
+// Import themes (CSS variable definitions at root level)
+@use 'themes/light';
+@use 'themes/dark';
+@use 'themes/blue';
+
+// Import component styles
+@use 'components/shared';
+@use 'components/app';
+@use 'components/inbox-view';
+@use 'components/item-detail';
+@use 'components/source-config';
+@use 'components/custom-view-view';
+@use 'components/custom-view-config';
+@use 'components/leaving-soon-view';
+@use 'components/link-hover-preview';
+
+// Global styles
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background: var(--color-bg-secondary);
+  overflow: hidden;
+  color: var(--color-text-primary);
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+}
+

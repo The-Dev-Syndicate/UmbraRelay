@@ -139,6 +139,15 @@ impl Database {
                 DROP INDEX IF EXISTS idx_sources_group;
                 "#
             ),
+            M::up(
+                r#"
+                CREATE TABLE IF NOT EXISTS user_preferences (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_user_preferences_key ON user_preferences(key);
+                "#
+            ),
         ]);
 
         migrations.to_latest(&mut conn)
@@ -660,6 +669,30 @@ impl Database {
             }
         }
 
+        Ok(())
+    }
+
+    // User preferences operations
+    pub fn get_user_preference(&self, key: &str) -> Result<Option<String>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT value FROM user_preferences WHERE key = ?1")?;
+        let mut rows = stmt.query_map(params![key], |row| {
+            Ok(row.get::<_, String>(0)?)
+        })?;
+        
+        if let Some(row) = rows.next() {
+            Ok(Some(row?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn set_user_preference(&self, key: &str, value: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT OR REPLACE INTO user_preferences (key, value) VALUES (?1, ?2)",
+            params![key, value],
+        )?;
         Ok(())
     }
 

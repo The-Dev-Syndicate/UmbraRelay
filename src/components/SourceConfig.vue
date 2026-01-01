@@ -80,6 +80,80 @@
       </div>
     </div>
 
+    <!-- Theme Selector Section -->
+    <div class="theme-selector-section">
+      <label class="theme-selector-label">Theme</label>
+      <div class="theme-options">
+        <label 
+          class="theme-option"
+          :class="{ active: currentTheme === 'system' }"
+        >
+          <input 
+            type="radio" 
+            value="system" 
+            :checked="currentTheme === 'system'"
+            @change="handleThemeChange('system')"
+          />
+          <span class="theme-name">System</span>
+          <span class="theme-preview">
+            <span class="theme-swatch" style="background: #ffffff; border-color: #000000;"></span>
+            <span class="theme-swatch" style="background: #1a1a1a; border-color: #ffffff;"></span>
+            <span class="system-indicator" v-if="currentTheme === 'system'">
+              ({{ systemPreference === 'dark' ? 'Dark' : 'Light' }})
+            </span>
+          </span>
+        </label>
+        <label 
+          class="theme-option"
+          :class="{ active: currentTheme === 'light' }"
+        >
+          <input 
+            type="radio" 
+            value="light" 
+            :checked="currentTheme === 'light'"
+            @change="handleThemeChange('light')"
+          />
+          <span class="theme-name">Light</span>
+          <span class="theme-preview">
+            <span class="theme-swatch" style="background: #ffffff;"></span>
+          </span>
+        </label>
+        <label 
+          class="theme-option"
+          :class="{ active: currentTheme === 'dark' }"
+        >
+          <input 
+            type="radio" 
+            value="dark" 
+            :checked="currentTheme === 'dark'"
+            @change="handleThemeChange('dark')"
+          />
+          <span class="theme-name">Dark</span>
+          <span class="theme-preview">
+            <span class="theme-swatch" style="background: #1a1a1a;"></span>
+          </span>
+        </label>
+        <label 
+          class="theme-option"
+          :class="{ active: currentTheme === 'blue' }"
+        >
+          <input 
+            type="radio" 
+            value="blue" 
+            :checked="currentTheme === 'blue'"
+            @change="handleThemeChange('blue')"
+          />
+          <span class="theme-name">Blue</span>
+          <span class="theme-preview">
+            <span class="theme-swatch" style="background: #2196f3;"></span>
+          </span>
+        </label>
+      </div>
+      <p class="theme-description">
+        Choose how UmbraRelay looks. System follows your OS preference.
+      </p>
+    </div>
+
     <!-- Group Management Section -->
     <div class="group-management-section">
       <div class="section-header">
@@ -499,11 +573,14 @@
 import { ref, onMounted } from 'vue';
 import { useSources } from '../composables/useSources';
 import { useGroups } from '../composables/useGroups';
+import { useTheme } from '../composables/useTheme';
 import { ask, MessageDialogOptions } from '@tauri-apps/plugin-dialog';
 import type { Source, SourceInput, UpdateSourceInput, Group } from '../types';
+import { formatDate } from '../utils/formatting';
 
 const { sources, loading, error, fetchSources, addSource, updateSource, removeSource: removeSourceAction, syncSource, syncAllSources } = useSources();
 const { groups, fetchGroups, addGroup, updateGroup, removeGroup: removeGroupAction } = useGroups();
+const { currentTheme, systemPreference, setTheme } = useTheme();
 
 const syncingSources = ref<Set<number>>(new Set());
 const deletingSources = ref<Set<number>>(new Set());
@@ -1068,10 +1145,15 @@ const removeNewGroup = (formType: 'edit' | 'group', index: number) => {
   form.newGroups.splice(index, 1);
 };
 
-const formatDate = (timestamp: number) => {
-  const date = new Date(timestamp * 1000);
-  return date.toLocaleString();
+const handleThemeChange = async (theme: 'system' | 'light' | 'dark' | 'blue') => {
+  try {
+    await setTheme(theme);
+  } catch (error) {
+    console.error('Failed to change theme:', error);
+    alert('Failed to change theme. Please try again.');
+  }
 };
+
 
 onMounted(async () => {
   await fetchSources();
@@ -1080,483 +1162,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.source-config {
-  padding: 20px;
-  max-width: 1000px;
-  margin: 0 auto;
-}
-
-.sticky-header {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background: white;
-  padding: 12px 20px;
-  margin: -20px -20px 20px -20px;
-  border-bottom: 1px solid #e0e0e0;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  backdrop-filter: blur(10px);
-  background: rgba(255, 255, 255, 0.95);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.header-left h1 {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-}
-
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.action-button {
-  padding: 8px 16px;
-  border: 1px solid #ddd;
-  background: white;
-  cursor: pointer;
-  border-radius: 4px;
-  font-size: 14px;
-}
-
-.action-button.primary {
-  background: #396cd8;
-  color: white;
-  border-color: #396cd8;
-}
-
-.action-button:hover:not(:disabled) {
-  background: #f5f5f5;
-}
-
-.action-button.primary:hover:not(:disabled) {
-  background: #2952b8;
-}
-
-.action-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.loading {
-  text-align: center;
-  padding: 20px;
-}
-
-.error-message {
-  background: #ffebee;
-  border: 1px solid #d32f2f;
-  color: #d32f2f;
-  padding: 12px 16px;
-  border-radius: 4px;
-  margin-bottom: 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.dismiss-error {
-  background: none;
-  border: none;
-  color: #d32f2f;
-  font-size: 20px;
-  cursor: pointer;
-  padding: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-}
-
-.dismiss-error:hover {
-  background: rgba(211, 47, 47, 0.1);
-  border-radius: 50%;
-}
-
-.sources-list {
-  margin-bottom: 40px;
-}
-
-.source-card {
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 12px;
-  background: white;
-}
-
-.source-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.source-header h3 {
-  margin: 0 0 4px 0;
-}
-
-.source-type {
-  font-size: 12px;
-  text-transform: uppercase;
-  color: #666;
-}
-
-.source-group {
-  font-size: 12px;
-  padding: 2px 8px;
-  background: #e3f2fd;
-  color: #1976d2;
-  border-radius: 12px;
-  font-weight: 500;
-}
-
-.source-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.icon-button {
-  padding: 6px 10px;
-  border: 1px solid #ddd;
-  background: white;
-  cursor: pointer;
-  border-radius: 4px;
-  font-size: 16px;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 32px;
-  height: 32px;
-}
-
-.icon-button:hover:not(:disabled) {
-  background: #f5f5f5;
-}
-
-.icon-button.delete {
-  color: #d32f2f;
-  border-color: #d32f2f;
-}
-
-.icon-button.delete:hover:not(:disabled) {
-  background: #ffebee;
-}
-
-.icon-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.source-info {
-  font-size: 14px;
-  color: #666;
-}
-
-.group-management-section {
-  border-top: 2px solid #ddd;
-  margin-top: 20px;
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.section-header h2 {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 40px;
-  color: #666;
-  font-style: italic;
-}
-
-.groups-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.group-card {
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 16px;
-  background: white;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.group-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.group-name {
-  font-weight: 500;
-  font-size: 16px;
-}
-
-.group-count {
-  font-size: 12px;
-  color: #666;
-}
-
-.group-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.tabs {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-
-.tabs button {
-  padding: 10px 20px;
-  border: 1px solid #ddd;
-  background: white;
-  cursor: pointer;
-  border-radius: 4px;
-}
-
-.tabs button.active {
-  background: #396cd8;
-  color: white;
-  border-color: #396cd8;
-}
-
-.source-form {
-  max-width: 100%;
-  width: 100%;
-}
-
-.form-group {
-  margin-bottom: 16px;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 6px;
-  font-weight: 500;
-}
-
-.form-group input[type="text"],
-.form-group input[type="url"],
-.form-group input[type="password"] {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
-  box-sizing: border-box;
-}
-
-.form-group input[type="checkbox"] {
-  margin-right: 8px;
-}
-
-
-.checkbox-group {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  max-height: 200px;
-  overflow-y: auto;
-  padding: 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: #f9f9f9;
-}
-
-@media (max-width: 768px) {
-  .checkbox-group {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 480px) {
-  .checkbox-group {
-    grid-template-columns: 1fr;
-  }
-}
-
-.checkbox-option {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  padding: 4px;
-}
-
-.checkbox-option:hover {
-  background: #f0f0f0;
-  border-radius: 4px;
-}
-
-.no-groups-hint {
-  font-size: 12px;
-  color: #666;
-  font-style: italic;
-  margin: 0;
-  padding: 8px;
-}
-
-
-.submit-button {
-  padding: 10px 20px;
-  background: #396cd8;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 16px;
-  transition: all 0.2s;
-}
-
-.submit-button:hover {
-  background: #2952b8;
-}
-
-.edit-panel-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 1000;
-  display: flex;
-  animation: fadeIn 0.2s ease-out;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.edit-panel {
-  position: fixed;
-  top: 0;
-  right: 0;
-  width: 500px;
-  max-width: 90vw;
-  height: 100vh;
-  background: white;
-  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
-  display: flex;
-  flex-direction: column;
-  z-index: 1001;
-  animation: slideInRight 0.3s ease-out;
-  overflow-y: auto;
-}
-
-@keyframes slideInRight {
-  from {
-    transform: translateX(100%);
-  }
-  to {
-    transform: translateX(0);
-  }
-}
-
-.edit-panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  border-bottom: 1px solid #e0e0e0;
-  background: #f8f9fa;
-  position: relative;
-}
-
-.edit-panel-header h2 {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  flex: 1;
-}
-
-.close-button {
-  background: none;
-  border: none;
-  font-size: 32px;
-  line-height: 1;
-  cursor: pointer;
-  color: #666;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition: all 0.2s;
-  position: absolute;
-  top: 20px;
-  right: 20px;
-}
-
-.close-button:hover {
-  background: #e0e0e0;
-  color: #333;
-}
-
-.edit-panel-content {
-  padding: 20px;
-  flex: 1;
-  overflow-y: auto;
-}
-
-.form-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid #e0e0e0;
-}
-
-.cancel-button {
-  flex: 1;
-  padding: 12px 24px;
-  border: 1px solid #ddd;
-  background: white;
-  color: #333;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 16px;
-  transition: all 0.2s;
-}
-
-.cancel-button:hover {
-  background: #f5f5f5;
-  border-color: #bbb;
-}
-
-.form-actions .submit-button {
-  flex: 1;
-  padding: 12px 24px;
-  font-weight: 500;
-}
+/* Styles moved to src/styles/components/_source-config.scss */
 </style>
 

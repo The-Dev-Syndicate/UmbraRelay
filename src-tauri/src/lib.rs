@@ -64,6 +64,8 @@ pub fn run() {
             commands::add_group,
             commands::update_group,
             commands::remove_group,
+            commands::get_user_preference,
+            commands::set_user_preference,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

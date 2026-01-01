@@ -1,0 +1,213 @@
+// InboxView Component Styles
+@use '../variables' as *;
+
+.inbox-view {
+  padding: $spacing-lg;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $spacing-lg;
+
+  h1 {
+    margin: 0;
+    font-size: $font-xl;
+    font-weight: $font-semibold;
+    letter-spacing: -0.3px;
+  }
+}
+
+.filters-container {
+  display: flex;
+  gap: $spacing-lg;
+  align-items: center;
+}
+
+.filters {
+  display: flex;
+  gap: 10px;
+
+  button {
+    padding: $spacing-sm $spacing-lg;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-primary);
+    cursor: pointer;
+    border-radius: $radius-sm;
+    color: var(--color-text-primary);
+    transition: all $transition-base;
+
+    &.active {
+      background: var(--color-primary);
+      color: var(--color-primary-text);
+      border-color: var(--color-primary);
+    }
+  }
+}
+
+.group-filter {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  position: relative;
+}
+
+.group-filter-dropdown {
+  position: relative;
+
+  &.open .dropdown-arrow {
+    transform: rotate(180deg);
+  }
+}
+
+.group-filter-button {
+  padding: $spacing-sm $spacing-lg;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
+  border-radius: $radius-sm;
+  font-size: $font-md;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  min-width: 140px;
+  justify-content: space-between;
+  transition: all $transition-base;
+  color: var(--color-text-primary);
+
+  &:hover {
+    border-color: var(--color-primary);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--color-primary);
+  }
+}
+
+.dropdown-arrow {
+  font-size: 10px;
+  transition: transform $transition-base;
+}
+
+.group-filter-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: $radius-md;
+  box-shadow: $shadow-md;
+  z-index: $z-dropdown;
+  min-width: 220px;
+  max-width: 300px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.group-filter-header {
+  padding: $spacing-md $spacing-lg;
+  border-bottom: 1px solid var(--color-border-light);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: $font-semibold;
+  font-size: $font-md;
+}
+
+.clear-all-btn {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  cursor: pointer;
+  font-size: $font-base;
+  padding: $spacing-xs $spacing-sm;
+  border-radius: $radius-sm;
+  transition: background $transition-base;
+
+  &:hover {
+    background: var(--color-bg-hover);
+  }
+}
+
+.group-filter-options {
+  padding: $spacing-sm 0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.group-option {
+  display: flex;
+  align-items: center;
+  padding: 10px $spacing-lg;
+  cursor: pointer;
+  transition: background $transition-base;
+
+  &:hover {
+    background: var(--color-bg-panel);
+  }
+
+  input[type="checkbox"] {
+    margin-right: 10px;
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+    accent-color: var(--color-primary);
+  }
+}
+
+.group-option-label {
+  font-size: $font-md;
+  color: var(--color-text-primary);
+  user-select: none;
+}
+
+.selected-groups-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.group-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  padding: 6px $spacing-md;
+  border-radius: 16px;
+  font-size: $font-base;
+  font-weight: $font-medium;
+}
+
+.pill-remove {
+  background: rgba(255, 255, 255, 0.3);
+  border: none;
+  color: var(--color-primary-text);
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: $font-lg;
+  line-height: 1;
+  padding: 0;
+  transition: background $transition-base;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.5);
+  }
+}
+
+.items-list {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
