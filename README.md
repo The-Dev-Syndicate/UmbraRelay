@@ -15,7 +15,6 @@ UmbraRelay aggregates RSS feeds and GitHub issues/PRs into a unified inbox. All 
 - **GitHub Integration**: Track issues and PRs assigned to you
 - **Unified Inbox**: Single interface for all sources
 - **Local-First**: All data stored locally in SQLite
-- **Configurable**: TOML config file or UI
 - **Automatic Polling**: Background sync at configurable intervals
 
 ## Quick Start
@@ -55,25 +54,6 @@ Comprehensive documentation is available in the `documentation/` folder:
 - **[Console Commands](documentation/technical/console-commands.md)** - Power user console commands
 - **[Examples](documentation/examples/)** - Configuration examples and use cases
 
-## Configuration
-
-UmbraRelay can be configured via TOML file or UI. See [Configuration Guide](documentation/user-guide/configuration.md).
-
-**Example config** (`umbrarelay.toml`):
-```toml
-[github]
-poll_interval = "5m"
-
-[[github.repos]]
-owner = "dev-syndicate"
-repo = "UmbraRelay"
-assigned_only = true
-
-[[rss]]
-name = "Hacker News"
-url = "https://news.ycombinator.com/rss"
-poll_interval = "10m"
-```
 
 ## Tech Stack
 
@@ -88,7 +68,7 @@ See [Development Guide](documentation/technical/development.md) for setup and co
 
 ## License
 
-[Add your license here]
+Pending - All rights reserved I guess for now.
 
 ## Contributing
 
