@@ -13,7 +13,7 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     outputs:
-      release_id: ${{ steps.release_id.outputs.id }}
+      release_id: ${{ steps.get_release_id.outputs.id }}
     steps:
       - uses: actions/checkout@v4
       - name: setup node
@@ -41,7 +41,7 @@ jobs:
             echo "has_changelog=false" >> $GITHUB_OUTPUT
           fi
       - name: create release
-        id: release
+        id: release_creation
         uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -53,10 +53,37 @@ jobs:
           generate_release_notes: ${{ steps.changelog.outputs.has_changelog != 'true' }}
           body_path: ${{ steps.changelog.outputs.has_changelog == 'true' && 'changelog_section.md' || '' }}
       - name: get release id
-        id: release_id
+        id: get_release_id
         run: |
-          RELEASE_ID=$(gh api repos/${{ github.repository }}/releases/tags/${{ github.ref_name }} --jq .id)
-          echo "id=$RELEASE_ID" >> $GITHUB_OUTPUT
+          echo "Repository: ${{ github.repository }}"
+          echo "Tag: ${{ github.ref_name }}"
+          # Wait a moment for the release to be fully created
+          sleep 3
+          # Retry getting the release ID with exponential backoff
+          for i in {1..10}; do
+            echo "Attempt $i: Fetching release ID..."
+            RELEASE_ID=$(gh api repos/${{ github.repository }}/releases/tags/${{ github.ref_name }} --jq .id 2>&1)
+            EXIT_CODE=$?
+            if [ $EXIT_CODE -eq 0 ] && [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "null" ]; then
+              echo "id=$RELEASE_ID" >> $GITHUB_OUTPUT
+              echo "✓ Release ID found: $RELEASE_ID"
+              exit 0
+            fi
+            if [ $EXIT_CODE -ne 0 ]; then
+              echo "API call failed (exit code: $EXIT_CODE): $RELEASE_ID"
+            else
+              echo "Release ID is empty or null, retrying..."
+            fi
+            if [ $i -lt 10 ]; then
+              WAIT_TIME=$((i * 2))
+              echo "Waiting ${WAIT_TIME}s before retry..."
+              sleep $WAIT_TIME
+            fi
+          done
+          echo "Error: Failed to get release ID after 10 attempts"
+          echo "Listing all releases for debugging:"
+          gh api repos/${{ github.repository }}/releases --jq '.[] | "\(.tag_name): \(.id)"' || true
+          exit 1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
