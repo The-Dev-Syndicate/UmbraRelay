@@ -46,41 +46,37 @@ jobs:
           TAG_NAME="${{ github.ref_name }}"
           RELEASE_NAME="UmbraRelay ${{ github.ref_name }}"
           
-          # Prepare release body
+          # Prepare release notes
           if [ "${{ steps.changelog.outputs.has_changelog }}" = "true" ] && [ -f changelog_section.md ]; then
-            # Use changelog content - gh api will handle JSON encoding
-            echo "Using changelog content for release body"
-            BODY_FILE="changelog_section.md"
-            USE_BODY=true
+            # Use changelog content
+            echo "Using changelog content for release notes"
+            NOTES_FILE="changelog_section.md"
+            USE_NOTES=true
           else
-            # Will use auto-generated notes
+            # Will use auto-generated notes via gh release create
             echo "Will use auto-generated release notes"
-            USE_BODY=false
+            USE_NOTES=false
           fi
           
-          # Create release via API and get ID immediately from response
+          # Create release and get ID immediately
           echo "Creating release: $RELEASE_NAME for tag: $TAG_NAME"
           
-          if [ "$USE_BODY" = "true" ]; then
-            # Create release with body from file
-            RESPONSE=$(gh api repos/${{ github.repository }}/releases \
-              -X POST \
-              -f tag_name="$TAG_NAME" \
-              -f name="$RELEASE_NAME" \
-              -f draft=true \
-              -f prerelease=false \
-              -F "body=@$BODY_FILE" \
-              --jq '{id: .id, url: .html_url, tag_name: .tag_name}' 2>&1)
+          if [ "$USE_NOTES" = "true" ]; then
+            # Create release with notes from file
+            RESPONSE=$(gh release create "$TAG_NAME" \
+              --title "$RELEASE_NAME" \
+              --notes-file "$NOTES_FILE" \
+              --draft \
+              --repo ${{ github.repository }} \
+              --json id,url,tag_name 2>&1)
           else
             # Create release with auto-generated notes
-            RESPONSE=$(gh api repos/${{ github.repository }}/releases \
-              -X POST \
-              -f tag_name="$TAG_NAME" \
-              -f name="$RELEASE_NAME" \
-              -f draft=true \
-              -f prerelease=false \
-              -f generate_release_notes=true \
-              --jq '{id: .id, url: .html_url, tag_name: .tag_name}' 2>&1)
+            RESPONSE=$(gh release create "$TAG_NAME" \
+              --title "$RELEASE_NAME" \
+              --generate-notes \
+              --draft \
+              --repo ${{ github.repository }} \
+              --json id,url,tag_name 2>&1)
           fi
           
           EXIT_CODE=$?
@@ -109,6 +105,8 @@ jobs:
               echo "Release already exists with ID: $EXISTING"
               echo "id=$EXISTING" >> $GITHUB_OUTPUT
             else
+              echo "Full error details:"
+              echo "$RESPONSE"
               exit 1
             fi
           fi
