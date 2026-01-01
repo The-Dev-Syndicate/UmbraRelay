@@ -52,38 +52,80 @@ jobs:
           prerelease: false
           generate_release_notes: ${{ steps.changelog.outputs.has_changelog != 'true' }}
           body_path: ${{ steps.changelog.outputs.has_changelog == 'true' && 'changelog_section.md' || '' }}
+      - name: verify release creation succeeded
+        run: |
+          if [ "${{ steps.release_creation.outcome }}" != "success" ]; then
+            echo "❌ Release creation step failed!"
+            echo "This may indicate a permissions issue or API problem."
+            exit 1
+          fi
+          echo "✓ Release creation step completed successfully"
+        continue-on-error: false
       - name: get release id
         id: get_release_id
         run: |
           echo "Repository: ${{ github.repository }}"
           echo "Tag: ${{ github.ref_name }}"
-          # Wait a moment for the release to be fully created
-          sleep 3
+          # Wait a moment for the release to be fully created and propagated
+          echo "Waiting for release to be fully created..."
+          sleep 5
           # Retry getting the release ID with exponential backoff
-          for i in {1..10}; do
+          for i in {1..15}; do
+            echo ""
             echo "Attempt $i: Fetching release ID..."
-            RELEASE_ID=$(gh api repos/${{ github.repository }}/releases/tags/${{ github.ref_name }} --jq .id 2>&1)
+            # Try to get release by tag
+            RELEASE_RESPONSE=$(gh api repos/${{ github.repository }}/releases/tags/${{ github.ref_name }} --jq '{id: .id, name: .name, draft: .draft}' 2>&1)
             EXIT_CODE=$?
-            if [ $EXIT_CODE -eq 0 ] && [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "null" ]; then
-              echo "id=$RELEASE_ID" >> $GITHUB_OUTPUT
-              echo "✓ Release ID found: $RELEASE_ID"
-              exit 0
-            fi
-            if [ $EXIT_CODE -ne 0 ]; then
-              echo "API call failed (exit code: $EXIT_CODE): $RELEASE_ID"
+            
+            if [ $EXIT_CODE -eq 0 ]; then
+              RELEASE_ID=$(echo "$RELEASE_RESPONSE" | jq -r '.id // empty' 2>/dev/null || echo "")
+              if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "null" ] && [ "$RELEASE_ID" != "" ]; then
+                echo "id=$RELEASE_ID" >> $GITHUB_OUTPUT
+                echo "✓ Release ID found: $RELEASE_ID"
+                echo "Release details: $RELEASE_RESPONSE"
+                exit 0
+              else
+                echo "Release response received but ID is empty: $RELEASE_RESPONSE"
+              fi
             else
-              echo "Release ID is empty or null, retrying..."
+              echo "API call failed (exit code: $EXIT_CODE)"
+              echo "Response: $RELEASE_RESPONSE"
+              
+              # Try alternative: list all releases and find by tag
+              echo "Trying alternative method: listing all releases..."
+              TAG_NAME="${{ github.ref_name }}"
+              ALL_RELEASES=$(gh api repos/${{ github.repository }}/releases --jq ".[] | select(.tag_name == \"$TAG_NAME\") | .id" 2>/dev/null || echo "")
+              if [ -n "$ALL_RELEASES" ] && [ "$ALL_RELEASES" != "null" ] && [ "$ALL_RELEASES" != "" ]; then
+                echo "id=$ALL_RELEASES" >> $GITHUB_OUTPUT
+                echo "✓ Release ID found via alternative method: $ALL_RELEASES"
+                exit 0
+              fi
             fi
-            if [ $i -lt 10 ]; then
+            
+            if [ $i -lt 15 ]; then
               WAIT_TIME=$((i * 2))
               echo "Waiting ${WAIT_TIME}s before retry..."
               sleep $WAIT_TIME
             fi
           done
-          echo "Error: Failed to get release ID after 10 attempts"
+          
+          echo ""
+          echo "❌ Error: Failed to get release ID after 15 attempts"
+          echo ""
+          echo "Debugging information:"
+          echo "Repository: ${{ github.repository }}"
+          echo "Tag: ${{ github.ref_name }}"
+          echo ""
           echo "Listing all releases for debugging:"
-          gh api repos/${{ github.repository }}/releases --jq '.[] | "\(.tag_name): \(.id)"' || true
-          exit 1
+          gh api repos/${{ github.repository }}/releases --jq '.[] | "\(.tag_name): \(.id) (draft: \(.draft))"' || echo "Failed to list releases"
+          echo ""
+          echo "Checking if tag exists:"
+          gh api repos/${{ github.repository }}/git/refs/tags/${{ github.ref_name }} || echo "Tag not found"
+          echo ""
+          echo "Note: The release may still have been created. Check the Releases page manually."
+          echo "The build jobs will continue but may not attach artifacts automatically."
+          # Don't fail the job - let builds continue
+          echo "id=0" >> $GITHUB_OUTPUT
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -125,12 +167,35 @@ jobs:
       - name: install frontend dependencies
         run: npm install
       
-      - uses: tauri-apps/tauri-action@v0
+      - name: check release id
+        id: check_release
+        run: |
+          RELEASE_ID="${{ needs.create-release.outputs.release_id }}"
+          if [ -z "$RELEASE_ID" ] || [ "$RELEASE_ID" = "0" ]; then
+            echo "⚠️  Warning: Release ID not found, attempting to find release by tag..."
+            # Try to find the release by tag
+            FOUND_ID=$(gh api repos/${{ github.repository }}/releases/tags/${{ github.ref_name }} --jq .id 2>/dev/null || echo "")
+            if [ -n "$FOUND_ID" ] && [ "$FOUND_ID" != "null" ]; then
+              echo "✓ Found release ID: $FOUND_ID"
+              echo "release_id=$FOUND_ID" >> $GITHUB_OUTPUT
+            else
+              echo "❌ Could not find release. Build may fail to upload artifacts."
+              echo "release_id=" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "✓ Using release ID: $RELEASE_ID"
+            echo "release_id=$RELEASE_ID" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+      - name: build and upload
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: ./
           tagName: ${{ github.ref_name }}
-          releaseId: ${{ needs.create-release.outputs.release_id }}
+          releaseId: ${{ steps.check_release.outputs.release_id }}
           args: ${{ matrix.args }}
 
