@@ -10,8 +10,95 @@ permissions:
   contents: write
 
 jobs:
+  prepare-release:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.set_version.outputs.version }}
+      release_notes: ${{ steps.release_notes.outputs.body }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for release notes
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Extract and set version
+        id: set_version
+        shell: bash
+        run: |
+          # Extract version from tag (remove 'v' prefix)
+          VERSION="${{ github.ref_name }}"
+          VERSION=${VERSION#v}  # Remove 'v' prefix
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Setting version to: $VERSION"
+
+      - name: Update version files
+        shell: bash
+        run: |
+          VERSION="${{ steps.set_version.outputs.version }}"
+          
+          # Update package.json
+          npm version "$VERSION" --no-git-tag-version
+          
+          # Update tauri.conf.json using jq
+          jq --arg v "$VERSION" '.version = $v' src-tauri/tauri.conf.json > src-tauri/tauri.conf.json.tmp && \
+            mv src-tauri/tauri.conf.json.tmp src-tauri/tauri.conf.json
+          
+          # Update Cargo.toml
+          sed -i.bak "s/^version = \".*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
+          rm -f src-tauri/Cargo.toml.bak
+          
+          echo "✓ Version updated to $VERSION in all files"
+
+      - name: Commit version changes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
+          git commit -m "chore: update version to ${{ steps.set_version.outputs.version }} for release ${{ github.ref_name }}" || exit 0
+          git push origin HEAD:main || echo "No changes to commit or push failed"
+        continue-on-error: true
+
+      - name: Prepare release notes
+        id: release_notes
+        shell: bash
+        run: |
+          VERSION="${{ github.ref_name }}"
+          RELEASE_BODY=""
+          
+          # Generate auto-release notes (same as GitHub UI)
+          echo "Generating auto-release notes (same as GitHub UI)..."
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+          
+          if [ -n "$PREV_TAG" ]; then
+            RELEASE_BODY=$(gh api repos/${{ github.repository }}/releases/generate-notes \
+              -f tag_name="$VERSION" \
+              -f previous_tag_name="$PREV_TAG" \
+              --jq .body 2>/dev/null || echo "")
+          else
+            RELEASE_BODY=$(gh api repos/${{ github.repository }}/releases/generate-notes \
+              -f tag_name="$VERSION" \
+              --jq .body 2>/dev/null || echo "")
+          fi
+          
+          if [ -z "$RELEASE_BODY" ]; then
+            RELEASE_BODY="Release $VERSION"
+          fi
+          
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "$RELEASE_BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build-tauri:
     name: Build Tauri (${{ matrix.platform }})
+    needs: prepare-release
     runs-on: ${{ matrix.platform }}
 
     strategy:
@@ -78,79 +165,6 @@ jobs:
         run: npm ci
 
       # ─────────────────────────────────────────────────────────────
-      # Update version from tag
-      # ─────────────────────────────────────────────────────────────
-      - name: Update version from tag
-        run: |
-          # Extract version from tag (remove 'v' prefix)
-          VERSION="${{ github.ref_name }}"
-          VERSION=${VERSION#v}  # Remove 'v' prefix
-          echo "Setting version to: $VERSION"
-          
-          # Update package.json
-          npm version "$VERSION" --no-git-tag-version
-          
-          # Update tauri.conf.json using jq
-          jq --arg v "$VERSION" '.version = $v' src-tauri/tauri.conf.json > src-tauri/tauri.conf.json.tmp && \
-            mv src-tauri/tauri.conf.json.tmp src-tauri/tauri.conf.json
-          
-          # Update Cargo.toml (use sed - works on all GitHub Actions runners)
-          sed -i.bak "s/^version = \".*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
-          rm -f src-tauri/Cargo.toml.bak
-          
-          echo "✓ Version updated to $VERSION in all files"
-
-      # ─────────────────────────────────────────────────────────────
-      # Prepare Release Notes
-      # ─────────────────────────────────────────────────────────────
-      - name: Prepare release notes
-        id: release_notes
-        run: |
-          VERSION="${{ github.ref_name }}"
-          RELEASE_BODY=""
-          
-          # TODO: Check if CHANGELOG.md exists and has a section for this version
-          # (Currently disabled - will use auto-generated notes)
-          # if [ -f CHANGELOG.md ]; then
-          #   if grep -qE "^## \[?$VERSION\]?" CHANGELOG.md || grep -qE "^## $VERSION" CHANGELOG.md; then
-          #     echo "Found changelog entry for $VERSION"
-          #     awk "/^## \[?$VERSION\]?/,/^## / {if (NR > 1 && /^## /) exit; print}" CHANGELOG.md > changelog_section.md || \
-          #     awk "/^## \[?$VERSION\]?/,EOF {print}" CHANGELOG.md > changelog_section.md
-          #     RELEASE_BODY=$(cat changelog_section.md)
-          #     echo "Using changelog from CHANGELOG.md"
-          #   fi
-          # fi
-          
-          # Generate auto-release notes (same as GitHub UI)
-          echo "Generating auto-release notes (same as GitHub UI)..."
-          # Get the previous tag
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
-          
-          if [ -n "$PREV_TAG" ]; then
-            # Generate notes from commits between tags (same as UI)
-            RELEASE_BODY=$(gh api repos/${{ github.repository }}/releases/generate-notes \
-              -f tag_name="$VERSION" \
-              -f previous_tag_name="$PREV_TAG" \
-              --jq .body 2>/dev/null || echo "")
-          else
-            # First release - generate notes from all commits
-            RELEASE_BODY=$(gh api repos/${{ github.repository }}/releases/generate-notes \
-              -f tag_name="$VERSION" \
-              --jq .body 2>/dev/null || echo "")
-          fi
-          
-          if [ -z "$RELEASE_BODY" ]; then
-            RELEASE_BODY="Release $VERSION"
-          fi
-          
-          # Escape for JSON and set as output
-          echo "body<<EOF" >> $GITHUB_OUTPUT
-          echo "$RELEASE_BODY" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # ─────────────────────────────────────────────────────────────
       # Build & Release
       # ─────────────────────────────────────────────────────────────
       - name: Build and upload Tauri app
@@ -160,5 +174,5 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "UmbraRelay ${{ github.ref_name }}"
-          releaseBody: ${{ steps.release_notes.outputs.body }}
+          releaseBody: ${{ needs.prepare-release.outputs.release_notes }}
           releaseDraft: true
