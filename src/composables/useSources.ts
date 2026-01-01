@@ -20,7 +20,7 @@ export function useSources() {
     }
   };
 
-  const addSource = async (source: SourceInput): Promise<number | null> => {
+  const addSource = async (source: SourceInput): Promise<number> => {
     try {
       const id = await invoke<number>('add_source', { source });
       await fetchSources();
@@ -28,17 +28,32 @@ export function useSources() {
     } catch (e) {
       error.value = e as string;
       console.error('Failed to add source:', e);
-      return null;
+      throw e; // Re-throw so UI can handle it
     }
   };
 
   const updateSource = async (id: number, update: UpdateSourceInput) => {
     try {
-      await invoke('update_source', { id, update });
+      // Ensure group_ids is properly serialized (convert Proxy to plain array if needed)
+      const serializedUpdate: UpdateSourceInput = {
+        name: update.name,
+        config_json: update.config_json,
+        enabled: update.enabled,
+        token: update.token,
+        group_ids: update.group_ids ? (Array.isArray(update.group_ids) ? [...update.group_ids] : update.group_ids) : null,
+      };
+      console.log('updateSource: calling invoke with', { id, update: serializedUpdate });
+      console.log('updateSource: serialized group_ids type:', typeof serializedUpdate.group_ids, Array.isArray(serializedUpdate.group_ids));
+      
+      const result = await invoke('update_source', { id, update: serializedUpdate });
+      console.log('updateSource: invoke completed', result);
       await fetchSources();
+      console.log('updateSource: fetchSources completed');
     } catch (e) {
       error.value = e as string;
       console.error('Failed to update source:', e);
+      console.error('Error details:', JSON.stringify(e, null, 2));
+      throw e; // Re-throw so UI can handle it
     }
   };
 
@@ -64,6 +79,18 @@ export function useSources() {
     } catch (e) {
       error.value = e as string;
       console.error('Failed to sync source:', e);
+      throw e; // Re-throw so UI can handle it
+    }
+  };
+
+  const syncAllSources = async () => {
+    try {
+      await invoke('sync_all_sources');
+      await fetchSources();
+    } catch (e) {
+      error.value = e as string;
+      console.error('Failed to sync all sources:', e);
+      throw e; // Re-throw so UI can handle it
     }
   };
 
@@ -76,6 +103,7 @@ export function useSources() {
     updateSource,
     removeSource,
     syncSource,
+    syncAllSources,
   };
 }
 

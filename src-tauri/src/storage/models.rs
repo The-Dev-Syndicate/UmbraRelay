@@ -9,8 +9,6 @@ pub struct Source {
     pub config_json: String,
     pub enabled: bool,
     pub last_synced_at: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub group: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -52,9 +50,8 @@ impl Source {
             config_json: row.get(3)?,
             enabled: row.get::<_, i64>(4)? != 0,
             last_synced_at: row.get(5)?,
-            group: row.get(6)?,
-            created_at: row.get(7)?,
-            updated_at: row.get(8)?,
+            created_at: row.get(6)?,
+            updated_at: row.get(7)?,
         })
     }
 }
@@ -101,6 +98,25 @@ impl Item {
             comments: row.get(14).ok(),
             source_name: row.get(15).ok(),
             source_group: row.get(16).ok(),
+        })
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Group {
+    pub id: i64,
+    pub name: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+impl Group {
+    pub fn from_row(row: &Row) -> rusqlite::Result<Group> {
+        Ok(Group {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            created_at: row.get(2)?,
+            updated_at: row.get(3)?,
         })
     }
 }

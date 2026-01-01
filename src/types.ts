@@ -33,6 +33,13 @@ export interface CustomViewInput {
   groupNames?: string[] | null;
 }
 
+export interface Group {
+  id: number;
+  name: string;
+  created_at: number;
+  updated_at: number;
+}
+
 export interface Source {
   id: number;
   source_type: 'rss' | 'github';
@@ -40,7 +47,7 @@ export interface Source {
   config_json: Record<string, any> | string; // Can be string from backend or parsed object
   enabled: boolean;
   last_synced_at: number | null;
-  group?: string | null;
+  group_ids?: number[]; // Group relationships via source_groups junction table
 }
 
 export interface SourceInput {
@@ -48,7 +55,7 @@ export interface SourceInput {
   name: string;
   config_json: Record<string, any>;
   token?: string;
-  group?: string | null;
+  group_ids?: number[] | null;
 }
 
 export interface UpdateSourceInput {
@@ -56,6 +63,6 @@ export interface UpdateSourceInput {
   config_json?: Record<string, any>;
   enabled?: boolean;
   token?: string;
-  group?: string | null;
+  group_ids?: number[]; // None = don't update, [] = clear groups, [1,2] = set groups
 }
 

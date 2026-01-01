@@ -96,6 +96,49 @@ impl Database {
                 ALTER TABLE items ADD COLUMN comments TEXT;
                 "#
             ),
+            M::up(
+                r#"
+                CREATE TABLE IF NOT EXISTS groups (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_groups_name ON groups(name);
+                "#
+            ),
+            M::up(
+                r#"
+                CREATE TABLE IF NOT EXISTS source_groups (
+                    source_id INTEGER NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
+                    group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+                    PRIMARY KEY (source_id, group_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_source_groups_source_id ON source_groups(source_id);
+                CREATE INDEX IF NOT EXISTS idx_source_groups_group_id ON source_groups(group_id);
+                "#
+            ),
+            M::up(
+                r#"
+                -- Drop the legacy group column from sources table
+                -- SQLite doesn't support DROP COLUMN directly, so we use a workaround
+                CREATE TABLE sources_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    type TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    config_json TEXT NOT NULL,
+                    enabled INTEGER NOT NULL DEFAULT 1,
+                    last_synced_at INTEGER,
+                    created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL
+                );
+                INSERT INTO sources_new (id, type, name, config_json, enabled, last_synced_at, created_at, updated_at)
+                SELECT id, type, name, config_json, enabled, last_synced_at, created_at, updated_at FROM sources;
+                DROP TABLE sources;
+                ALTER TABLE sources_new RENAME TO sources;
+                DROP INDEX IF EXISTS idx_sources_group;
+                "#
+            ),
         ]);
 
         migrations.to_latest(&mut conn)
@@ -107,6 +150,9 @@ impl Database {
                 )
             })?;
 
+        // Migrate existing groups from comma-separated strings to groups table
+        let _ = Self::migrate_existing_groups(&conn);
+
         Ok(Database {
             conn: Arc::new(Mutex::new(conn)),
         })
@@ -114,20 +160,32 @@ impl Database {
 
 
     // Source CRUD operations
-    pub fn create_source(&self, source_type: &str, name: &str, config_json: &str, group: Option<&str>) -> Result<i64> {
+    pub fn create_source(&self, source_type: &str, name: &str, config_json: &str, group_ids: Option<&[i64]>) -> Result<i64> {
         let conn = self.conn.lock().unwrap();
         let now = Utc::now().timestamp();
         conn.execute(
-            r#"INSERT INTO sources (type, name, config_json, enabled, "group", created_at, updated_at) VALUES (?1, ?2, ?3, 1, ?4, ?5, ?5)"#,
-            params![source_type, name, config_json, group, now],
+            r#"INSERT INTO sources (type, name, config_json, enabled, created_at, updated_at) VALUES (?1, ?2, ?3, 1, ?4, ?4)"#,
+            params![source_type, name, config_json, now],
         )?;
-        Ok(conn.last_insert_rowid())
+        let source_id = conn.last_insert_rowid();
+        
+        // Set source-group relationships
+        if let Some(group_ids) = group_ids {
+            for group_id in group_ids {
+                let _ = conn.execute(
+                    "INSERT INTO source_groups (source_id, group_id) VALUES (?1, ?2)",
+                    params![source_id, group_id],
+                );
+            }
+        }
+        
+        Ok(source_id)
     }
 
     pub fn get_all_sources(&self) -> Result<Vec<Source>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            r#"SELECT id, type, name, config_json, enabled, last_synced_at, "group", created_at, updated_at FROM sources ORDER BY created_at DESC"#
+            r#"SELECT id, type, name, config_json, enabled, last_synced_at, created_at, updated_at FROM sources ORDER BY created_at DESC"#
         )?;
         let sources = stmt.query_map([], |row| Source::from_row(row))?
             .collect::<Result<Vec<_>, _>>()?;
@@ -137,53 +195,55 @@ impl Database {
     pub fn get_source(&self, id: i64) -> Result<Source> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            r#"SELECT id, type, name, config_json, enabled, last_synced_at, "group", created_at, updated_at FROM sources WHERE id = ?1"#
+            r#"SELECT id, type, name, config_json, enabled, last_synced_at, created_at, updated_at FROM sources WHERE id = ?1"#
         )?;
         stmt.query_row(params![id], |row| Source::from_row(row))
     }
 
-    pub fn update_source(&self, id: i64, name: Option<&str>, config_json: Option<&str>, enabled: Option<bool>, group: Option<Option<&str>>) -> Result<()> {
+    pub fn update_source(&self, id: i64, name: Option<&str>, config_json: Option<&str>, enabled: Option<bool>, group_ids: Option<Option<&[i64]>>) -> Result<()> {
+        eprintln!("update_source db method called with id={}, name={:?}, enabled={:?}, group_ids={:?}", id, name, enabled, group_ids);
         let conn = self.conn.lock().unwrap();
+        eprintln!("update_source: connection lock acquired");
         let now = Utc::now().timestamp();
+        eprintln!("update_source: timestamp={}", now);
         
         if let Some(name) = name {
+            eprintln!("update_source: updating name");
             conn.execute(
                 "UPDATE sources SET name = ?1, updated_at = ?2 WHERE id = ?3",
                 params![name, now, id],
             )?;
+            eprintln!("update_source: name updated");
         }
         
         if let Some(config_json) = config_json {
+            eprintln!("update_source: updating config_json");
             conn.execute(
                 "UPDATE sources SET config_json = ?1, updated_at = ?2 WHERE id = ?3",
                 params![config_json, now, id],
             )?;
+            eprintln!("update_source: config_json updated");
         }
         
         if let Some(enabled) = enabled {
+            eprintln!("update_source: updating enabled");
             conn.execute(
                 "UPDATE sources SET enabled = ?1, updated_at = ?2 WHERE id = ?3",
                 params![if enabled { 1 } else { 0 }, now, id],
             )?;
+            eprintln!("update_source: enabled updated");
         }
         
-        if let Some(group) = group {
-            // Treat empty strings as NULL
-            let group_value: Option<&str> = if let Some(g) = group {
-                if g.is_empty() {
-                    None
-                } else {
-                    Some(g)
-                }
-            } else {
-                None
-            };
-            conn.execute(
-                r#"UPDATE sources SET "group" = ?1, updated_at = ?2 WHERE id = ?3"#,
-                params![group_value, now, id],
-            )?;
+        if let Some(group_ids) = group_ids {
+            eprintln!("update_source: updating group_ids, calling set_source_groups");
+            // Update source-group relationships - pass the already-locked connection
+            Self::set_source_groups_internal(&conn, id, group_ids.unwrap_or(&[]))?;
+            eprintln!("update_source: set_source_groups completed");
+        } else {
+            eprintln!("update_source: group_ids is None, skipping group update");
         }
         
+        eprintln!("update_source: all updates completed, returning Ok");
         Ok(())
     }
 
@@ -251,8 +311,9 @@ impl Database {
     pub fn get_items(&self, state_filter: Option<&str>, group_filter: Option<&str>, source_ids: Option<&[i64]>, group_names: Option<&[String]>) -> Result<Vec<Item>> {
         let conn = self.conn.lock().unwrap();
         
-        // Always JOIN with sources to get source info
-        let mut query = "SELECT i.id, i.source_id, i.external_id, i.title, i.summary, i.url, i.item_type, i.state, i.created_at, i.updated_at, i.image_url, i.content_html, i.author, i.category, i.comments, s.name as source_name, s.\"group\" as source_group FROM items i INNER JOIN sources s ON i.source_id = s.id".to_string();
+        // JOIN with sources and groups tables to get group names
+        // Use LEFT JOIN for groups since a source might not have any groups
+        let mut query = "SELECT i.id, i.source_id, i.external_id, i.title, i.summary, i.url, i.item_type, i.state, i.created_at, i.updated_at, i.image_url, i.content_html, i.author, i.category, i.comments, s.name as source_name, GROUP_CONCAT(g.name, ', ') as source_group FROM items i INNER JOIN sources s ON i.source_id = s.id LEFT JOIN source_groups sg ON s.id = sg.source_id LEFT JOIN groups g ON sg.group_id = g.id".to_string();
         let mut conditions: Vec<String> = Vec::new();
         
         // Build params in order - need to store owned values for string parameters
@@ -277,26 +338,20 @@ impl Database {
         // Group names filter (from custom views) - takes precedence over legacy group_filter
         if let Some(groups) = group_names {
             if !groups.is_empty() {
-                let mut group_conditions = Vec::new();
-                for _group in groups {
-                    group_conditions.push(r#"(s."group" = ? OR s."group" LIKE ? OR s."group" LIKE ? OR s."group" LIKE ?)"#.to_string());
-                }
-                conditions.push(format!("({})", group_conditions.join(" OR ")));
-                // Collect all string parameters first
+                // Filter by group names using EXISTS subquery
+                let placeholders: Vec<String> = (1..=groups.len()).map(|_| "?".to_string()).collect();
+                conditions.push(format!(
+                    "EXISTS (SELECT 1 FROM source_groups sg2 INNER JOIN groups g2 ON sg2.group_id = g2.id WHERE sg2.source_id = s.id AND g2.name IN ({}))",
+                    placeholders.join(", ")
+                ));
                 for group in groups {
                     string_params.push(group.clone());
-                    string_params.push(format!("{},%", group));
-                    string_params.push(format!("%, {}, %", group));
-                    string_params.push(format!("%, {}", group));
                 }
             }
         } else if let Some(group) = group_filter {
-            // Legacy single group filter support
-            conditions.push(r#"(s."group" = ? OR s."group" LIKE ? OR s."group" LIKE ? OR s."group" LIKE ?)"#.to_string());
+            // Legacy single group filter support - now uses groups table
+            conditions.push("EXISTS (SELECT 1 FROM source_groups sg2 INNER JOIN groups g2 ON sg2.group_id = g2.id WHERE sg2.source_id = s.id AND g2.name = ?)".to_string());
             string_params.push(group.to_string());
-            string_params.push(format!("{},%", group));
-            string_params.push(format!("%, {}, %", group));
-            string_params.push(format!("%, {}", group));
         }
         
         if !conditions.is_empty() {
@@ -304,6 +359,8 @@ impl Database {
             query.push_str(&conditions.join(" AND "));
         }
         
+        // Group by item fields to handle GROUP_CONCAT properly
+        query.push_str(" GROUP BY i.id, i.source_id, i.external_id, i.title, i.summary, i.url, i.item_type, i.state, i.created_at, i.updated_at, i.image_url, i.content_html, i.author, i.category, i.comments, s.name");
         query.push_str(" ORDER BY i.created_at DESC");
         
         // Build params vector with proper references
@@ -332,17 +389,11 @@ impl Database {
                 if !groups.is_empty() {
                     for _group in groups {
                         params.push(&string_params[str_idx]);
-                        params.push(&string_params[str_idx + 1]);
-                        params.push(&string_params[str_idx + 2]);
-                        params.push(&string_params[str_idx + 3]);
-                        str_idx += 4;
+                        str_idx += 1;
                     }
                 }
             } else if group_filter.is_some() {
                 params.push(&string_params[str_idx]);
-                params.push(&string_params[str_idx + 1]);
-                params.push(&string_params[str_idx + 2]);
-                params.push(&string_params[str_idx + 3]);
             }
             
             stmt.query_map(rusqlite::params_from_iter(params.iter()), |row| Item::from_row_with_source(row))?
@@ -474,6 +525,169 @@ impl Database {
         Ok(conn.last_insert_rowid())
     }
 
+    // Group operations
+    pub fn get_all_groups(&self) -> Result<Vec<super::models::Group>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, name, created_at, updated_at FROM groups ORDER BY name"
+        )?;
+        let groups = stmt.query_map([], |row| super::models::Group::from_row(row))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(groups)
+    }
+
+    pub fn create_group(&self, name: &str) -> Result<i64> {
+        let conn = self.conn.lock().unwrap();
+        let now = Utc::now().timestamp();
+        conn.execute(
+            "INSERT INTO groups (name, created_at, updated_at) VALUES (?1, ?2, ?2)",
+            params![name, now],
+        )?;
+        Ok(conn.last_insert_rowid())
+    }
+
+    pub fn update_group(&self, id: i64, name: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let now = Utc::now().timestamp();
+        conn.execute(
+            "UPDATE groups SET name = ?1, updated_at = ?2 WHERE id = ?3",
+            params![name, now, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_group(&self, id: i64) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        // Delete from source_groups first (CASCADE should handle this, but explicit is better)
+        conn.execute(
+            "DELETE FROM source_groups WHERE group_id = ?1",
+            params![id],
+        )?;
+        // Delete the group
+        conn.execute(
+            "DELETE FROM groups WHERE id = ?1",
+            params![id],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_source_groups(&self, source_id: i64) -> Result<Vec<i64>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT group_id FROM source_groups WHERE source_id = ?1"
+        )?;
+        let group_ids = stmt.query_map(params![source_id], |row| row.get(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(group_ids)
+    }
+
+    // Internal helper that takes a connection reference (for use when connection is already locked)
+    fn set_source_groups_internal(conn: &Connection, source_id: i64, group_ids: &[i64]) -> Result<()> {
+        eprintln!("set_source_groups_internal called with source_id={}, group_ids={:?}", source_id, group_ids);
+        
+        // Delete existing relationships
+        eprintln!("set_source_groups_internal: deleting existing relationships");
+        conn.execute(
+            "DELETE FROM source_groups WHERE source_id = ?1",
+            params![source_id],
+        )?;
+        eprintln!("set_source_groups_internal: existing relationships deleted");
+        
+        // Insert new relationships
+        eprintln!("set_source_groups_internal: inserting {} new relationships", group_ids.len());
+        for (idx, group_id) in group_ids.iter().enumerate() {
+            eprintln!("set_source_groups_internal: inserting relationship {}/{}: source_id={}, group_id={}", idx + 1, group_ids.len(), source_id, group_id);
+            conn.execute(
+                "INSERT INTO source_groups (source_id, group_id) VALUES (?1, ?2)",
+                params![source_id, group_id],
+            )?;
+            eprintln!("set_source_groups_internal: relationship {}/{} inserted successfully", idx + 1, group_ids.len());
+        }
+        eprintln!("set_source_groups_internal: all relationships inserted, returning Ok");
+        Ok(())
+    }
+    
+    pub fn set_source_groups(&self, source_id: i64, group_ids: &[i64]) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        Self::set_source_groups_internal(&conn, source_id, group_ids)
+    }
+
+    // Migrate existing groups from comma-separated strings to groups table
+    fn migrate_existing_groups(conn: &Connection) -> Result<()> {
+        // Check if groups table exists and has data
+        let has_groups: bool = conn.query_row(
+            "SELECT COUNT(*) FROM groups",
+            [],
+            |row| Ok(row.get::<_, i64>(0)? > 0),
+        ).unwrap_or(false);
+
+        // Only migrate if groups table is empty
+        if has_groups {
+            return Ok(());
+        }
+
+        // Get all sources with groups
+        let mut stmt = conn.prepare(
+            r#"SELECT id, "group" FROM sources WHERE "group" IS NOT NULL AND "group" != ''"#
+        )?;
+        let source_groups: Vec<(i64, String)> = stmt.query_map([], |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+        let now = Utc::now().timestamp();
+        let mut group_map: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+
+        for (source_id, group_string) in source_groups {
+            // Parse comma-separated groups
+            let groups: Vec<String> = group_string
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+
+            for group_name in groups {
+                // Get or create group
+                let group_id = match group_map.get(&group_name) {
+                    Some(&id) => id,
+                    None => {
+                        // Try to find existing group
+                        let existing_id: Option<i64> = conn.query_row(
+                            "SELECT id FROM groups WHERE name = ?1",
+                            params![&group_name],
+                            |row| row.get(0),
+                        ).ok();
+
+                        match existing_id {
+                            Some(id) => {
+                                group_map.insert(group_name.clone(), id);
+                                id
+                            }
+                            None => {
+                                // Create new group
+                                conn.execute(
+                                    "INSERT INTO groups (name, created_at, updated_at) VALUES (?1, ?2, ?2)",
+                                    params![&group_name, now],
+                                )?;
+                                let id = conn.last_insert_rowid();
+                                group_map.insert(group_name.clone(), id);
+                                id
+                            }
+                        }
+                    }
+                };
+
+                // Create source-group relationship (ignore if already exists)
+                let _ = conn.execute(
+                    "INSERT OR IGNORE INTO source_groups (source_id, group_id) VALUES (?1, ?2)",
+                    params![source_id, group_id],
+                );
+            }
+        }
+
+        Ok(())
+    }
+
 }
 
 #[cfg(test)]
@@ -483,12 +697,11 @@ mod tests {
     #[test]
     fn test_database_creation() {
         let db = Database::new(":memory:").unwrap();
-        let conn = db.get_conn();
-        let conn = conn.lock().unwrap();
+        let conn = db.conn.lock().unwrap();
         
         // Test that tables exist
         let mut stmt = conn.prepare("SELECT name FROM sqlite_master WHERE type='table'").unwrap();
-        let tables: Vec<String> = stmt.query_map([], |row| row.get(0))
+        let tables: Vec<String> = stmt.query_map([], |row| row.get::<_, String>(0))
             .unwrap()
             .map(|r| r.unwrap())
             .collect();

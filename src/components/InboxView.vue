@@ -124,12 +124,12 @@ const showGroupDropdown = ref(false);
 
 const filters = ['All', 'Unread', 'Read', 'Archived'];
 
-// Get available groups from sources (parse comma-separated)
+// Get available groups from items' source_group field
 const availableGroups = computed(() => {
   const groups = new Set<string>();
-  sources.value.forEach(source => {
-    if (source.group) {
-      const parsed = source.group.split(',').map(g => g.trim()).filter(g => g.length > 0);
+  items.value.forEach(item => {
+    if (item.source_group) {
+      const parsed = parseGroups(item.source_group);
       parsed.forEach(g => groups.add(g));
     }
   });

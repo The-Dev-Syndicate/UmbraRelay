@@ -1,10 +1,30 @@
 <template>
   <div class="source-config">
-    <h1>Sources</h1>
+    <!-- Sticky Header -->
+    <div class="sticky-header">
+      <div class="header-left">
+        <h1>Sources</h1>
+      </div>
+      <div class="header-actions">
+        <button @click="openAddGroupPanel" class="action-button">
+          + Add Group
+        </button>
+        <button @click="showAddSourceModal = true" class="action-button primary">
+          + Add Source
+        </button>
+        <button 
+          @click="handleSyncAll" 
+          class="action-button"
+          :disabled="syncingAll"
+        >
+          {{ syncingAll ? 'Syncing...' : 'Sync All' }}
+        </button>
+      </div>
+    </div>
 
-    <div v-if="loading" class="loading">Loading...</div>
+    <div v-if="loading" class="loading">Loading sources and groups...</div>
     <div v-if="error" class="error-message">
-      {{ error }}
+      Error: {{ error }}
       <button @click="error = null" class="dismiss-error">×</button>
     </div>
 
@@ -13,35 +33,41 @@
         <div class="source-header">
           <div>
             <h3>{{ source.name }}</h3>
-            <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px;">
+            <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px; flex-wrap: wrap;">
               <span class="source-type">{{ source.source_type }}</span>
-              <span v-if="source.group" class="source-group">{{ source.group }}</span>
+              <span 
+                v-for="groupName in getSourceGroupNames(source)" 
+                :key="groupName" 
+                class="source-group"
+              >
+                {{ groupName }}
+              </span>
             </div>
           </div>
           <div class="source-actions">
-            <label class="toggle">
-              <input
-                type="checkbox"
-                :checked="source.enabled"
-                @change="toggleSource(source.id, ($event.target as HTMLInputElement).checked)"
-              />
-              <span>{{ source.enabled ? 'Enabled' : 'Disabled' }}</span>
-            </label>
             <button 
               @click="handleSyncSource(source.id)" 
-              class="sync-button"
+              class="icon-button"
               :disabled="syncingSources.has(source.id)"
+              :title="syncingSources.has(source.id) ? 'Syncing...' : 'Sync'"
             >
-              {{ syncingSources.has(source.id) ? 'Syncing...' : 'Sync' }}
+              ↻
             </button>
-            <button @click="editSource(source)" class="edit-button">Edit</button>
+            <button 
+              @click="editSource(source)" 
+              class="icon-button"
+              title="Edit"
+            >
+              ✏️
+            </button>
             <button 
               @click.stop="removeSource(source.id)" 
-              class="delete-button"
+              class="icon-button delete"
               :disabled="deletingSources.has(source.id)"
+              :title="deletingSources.has(source.id) ? 'Deleting...' : 'Delete'"
               type="button"
             >
-              {{ deletingSources.has(source.id) ? 'Deleting...' : 'Delete' }}
+              🗑️
             </button>
           </div>
         </div>
@@ -54,137 +80,162 @@
       </div>
     </div>
 
-    <div class="add-source-section">
-      <h2>Add Source</h2>
-      <div class="tabs">
-        <button
-          :class="{ active: newSourceType === 'rss' }"
-          @click="newSourceType = 'rss'"
-        >
-          RSS Feed
-        </button>
-        <button
-          :class="{ active: newSourceType === 'github' }"
-          @click="newSourceType = 'github'"
-        >
-          GitHub
-        </button>
+    <!-- Group Management Section -->
+    <div class="group-management-section">
+      <div class="section-header">
+        <h2>Group Management</h2>
       </div>
-
-      <form v-if="newSourceType === 'rss'" @submit.prevent="addRssSource" class="source-form">
-        <div class="form-group">
-          <label>Name</label>
-          <input v-model="rssForm.name" type="text" required placeholder="e.g., Hacker News" />
-        </div>
-        <div class="form-group">
-          <label>URL</label>
-          <input v-model="rssForm.url" type="url" required placeholder="https://example.com/feed.xml" />
-        </div>
-        <div class="form-group">
-          <label>Poll Interval (optional)</label>
-          <input v-model="rssForm.pollInterval" type="text" placeholder="10m" />
-        </div>
-        <div class="form-group">
-          <label>Groups (optional) - Type groups separated by commas</label>
-          <div class="group-input-container">
-            <div class="group-pills">
-              <span 
-                v-for="(group, index) in parseGroups(rssForm.group)" 
-                :key="index" 
-                class="group-pill"
-              >
-                {{ group }}
-                <button 
-                  type="button"
-                  @click="removeGroup('rss', index)"
-                  class="pill-remove"
-                >×</button>
-              </span>
-            </div>
-            <input 
-              v-model="rssForm.groupInput" 
-              type="text" 
-              placeholder="Type group name, press comma..." 
-              class="group-input"
-              @keydown="handleGroupKeydown($event, 'rss')"
-              @blur="handleGroupBlur('rss')"
-              list="groups-list-rss"
-              autocomplete="off"
-            />
-            <datalist id="groups-list-rss">
-              <option v-for="group in availableGroups" :key="group" :value="group" />
-            </datalist>
+      
+      <div v-if="groups.length === 0" class="empty-state">
+        <p>No groups yet. Create your first group to organize your sources.</p>
+      </div>
+      
+      <div v-else class="groups-list">
+        <div v-for="group in groups" :key="group.id" class="group-card">
+          <div class="group-info">
+            <span class="group-name">{{ group.name }}</span>
+            <span class="group-count">
+              {{ getGroupSourceCount(group.id) }} source{{ getGroupSourceCount(group.id) !== 1 ? 's' : '' }}
+            </span>
           </div>
-          <small style="color: #666; font-size: 12px; margin-top: 4px; display: block;">
-            Type a group name and press comma to add it as a tag
-          </small>
-        </div>
-        <button type="submit" class="submit-button">Add RSS Feed</button>
-      </form>
-
-      <form v-if="newSourceType === 'github'" @submit.prevent="addGitHubSource" class="source-form">
-        <div class="form-group">
-          <label>Name</label>
-          <input v-model="githubForm.name" type="text" required placeholder="e.g., My Project" />
-        </div>
-        <div class="form-group">
-          <label>Owner</label>
-          <input v-model="githubForm.owner" type="text" required placeholder="username or org" />
-        </div>
-        <div class="form-group">
-          <label>Repository</label>
-          <input v-model="githubForm.repo" type="text" required placeholder="repo-name" />
-        </div>
-        <div class="form-group">
-          <label>GitHub Token</label>
-          <input v-model="githubForm.token" type="password" required placeholder="ghp_..." />
-        </div>
-        <div class="form-group">
-          <label>
-            <input v-model="githubForm.assignedOnly" type="checkbox" />
-            Only show assigned issues/PRs
-          </label>
-        </div>
-        <div class="form-group">
-          <label>Groups (optional) - Type groups separated by commas</label>
-          <div class="group-input-container">
-            <div class="group-pills">
-              <span 
-                v-for="(group, index) in parseGroups(githubForm.group)" 
-                :key="index" 
-                class="group-pill"
-              >
-                {{ group }}
-                <button 
-                  type="button"
-                  @click="removeGroup('github', index)"
-                  class="pill-remove"
-                >×</button>
-              </span>
-            </div>
-            <input 
-              v-model="githubForm.groupInput" 
-              type="text" 
-              placeholder="Type group name, press comma..." 
-              class="group-input"
-              @keydown="handleGroupKeydown($event, 'github')"
-              @blur="handleGroupBlur('github')"
-              list="groups-list-github"
-              autocomplete="off"
-            />
-            <datalist id="groups-list-github">
-              <option v-for="group in availableGroups" :key="group" :value="group" />
-            </datalist>
+          <div class="group-actions">
+            <button 
+              @click="editGroup(group)" 
+              class="icon-button"
+              title="Edit"
+            >
+              ✏️
+            </button>
+            <button 
+              @click="removeGroup(group.id)" 
+              class="icon-button delete"
+              title="Delete"
+            >
+              🗑️
+            </button>
           </div>
-          <small style="color: #666; font-size: 12px; margin-top: 4px; display: block;">
-            Type a group name and press comma to add it as a tag
-          </small>
         </div>
-        <button type="submit" class="submit-button">Add GitHub Source</button>
-      </form>
+      </div>
     </div>
 
-    <!-- Slide-in Edit Panel -->
+    <!-- Add Source Modal -->
+    <div v-if="showAddSourceModal" class="edit-panel-overlay" @click="closeAddSourceModal">
+      <div class="edit-panel" @click.stop>
+        <div class="edit-panel-header">
+          <h2>Add Source</h2>
+          <button @click="closeAddSourceModal" class="close-button" title="Close">×</button>
+        </div>
+        
+        <div class="edit-panel-content">
+          <div class="tabs">
+            <button
+              :class="{ active: newSourceType === 'rss' }"
+              @click="newSourceType = 'rss'"
+            >
+              RSS Feed
+            </button>
+            <button
+              :class="{ active: newSourceType === 'github' }"
+              @click="newSourceType = 'github'"
+            >
+              GitHub
+            </button>
+          </div>
+
+          <!-- RSS Form -->
+          <form v-if="newSourceType === 'rss'" @submit.prevent="addRssSource" class="source-form" novalidate>
+            <div class="form-group">
+              <label>Name</label>
+              <input v-model="rssForm.name" type="text" required placeholder="e.g., Hacker News" />
+            </div>
+            <div class="form-group">
+              <label>URL</label>
+              <input v-model="rssForm.url" type="url" required placeholder="https://example.com/feed.xml" />
+            </div>
+            <div class="form-group">
+              <label>Poll Interval (optional)</label>
+              <input v-model="rssForm.pollInterval" type="text" placeholder="10m" />
+            </div>
+            <div class="form-group">
+              <label>Groups (optional)</label>
+              <div class="checkbox-group">
+                <label 
+                  v-for="group in groups" 
+                  :key="group.id"
+                  class="checkbox-option"
+                >
+                  <input 
+                    type="checkbox" 
+                    :value="group.id"
+                    v-model="rssForm.groupIds"
+                  />
+                  <span>{{ group.name }}</span>
+                </label>
+                <p v-if="groups.length === 0" class="no-groups-hint">
+                  No groups available. Create a group in the Group Management section.
+                </p>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="button" @click="closeAddSourceModal" class="cancel-button">Cancel</button>
+              <button type="submit" class="submit-button">Add RSS Feed</button>
+            </div>
+          </form>
+
+          <!-- GitHub Form -->
+          <form v-if="newSourceType === 'github'" @submit.prevent="addGitHubSource" class="source-form" novalidate>
+            <div class="form-group">
+              <label>Name</label>
+              <input v-model="githubForm.name" type="text" required placeholder="e.g., My Project" />
+            </div>
+            <div class="form-group">
+              <label>Owner</label>
+              <input v-model="githubForm.owner" type="text" required placeholder="username or org" />
+            </div>
+            <div class="form-group">
+              <label>Repository</label>
+              <input v-model="githubForm.repo" type="text" required placeholder="repo-name" />
+            </div>
+            <div class="form-group">
+              <label>GitHub Token</label>
+              <input v-model="githubForm.token" type="password" required placeholder="ghp_..." />
+            </div>
+            <div class="form-group">
+              <label>
+                <input v-model="githubForm.assignedOnly" type="checkbox" />
+                Only show assigned issues/PRs
+              </label>
+            </div>
+            <div class="form-group">
+              <label>Groups (optional)</label>
+              <div class="checkbox-group">
+                <label 
+                  v-for="group in groups" 
+                  :key="group.id"
+                  class="checkbox-option"
+                >
+                  <input 
+                    type="checkbox" 
+                    :value="group.id"
+                    v-model="githubForm.groupIds"
+                  />
+                  <span>{{ group.name }}</span>
+                </label>
+                <p v-if="groups.length === 0" class="no-groups-hint">
+                  No groups available. Create a group in the Group Management section.
+                </p>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="button" @click="closeAddSourceModal" class="cancel-button">Cancel</button>
+              <button type="submit" class="submit-button">Add GitHub Source</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Source Panel -->
     <div v-if="editingSource" class="edit-panel-overlay" @click="closeEditPanel">
       <div class="edit-panel" @click.stop>
         <div class="edit-panel-header">
@@ -194,7 +245,7 @@
         
         <div class="edit-panel-content">
           <!-- RSS Edit Form -->
-          <form v-if="editingSource && editingSource.source_type === 'rss'" @submit.prevent="saveEdit" class="source-form">
+          <form v-if="editingSource && editingSource.source_type === 'rss'" @submit.prevent="saveEdit" class="source-form" novalidate>
             <div class="form-group">
               <label>Name</label>
               <input v-model="editForm.name" type="text" required placeholder="e.g., Hacker News" />
@@ -208,35 +259,23 @@
               <input v-model="editForm.pollInterval" type="text" placeholder="10m" />
             </div>
             <div class="form-group">
-              <label>Groups (optional) - Type groups separated by commas</label>
-              <div class="group-input-container">
-                <div class="group-pills">
-                  <span 
-                    v-for="(group, index) in parseGroups(editForm.group)" 
-                    :key="index" 
-                    class="group-pill"
-                  >
-                    {{ group }}
-                    <button 
-                      type="button"
-                      @click="removeGroup('edit', index)"
-                      class="pill-remove"
-                    >×</button>
-                  </span>
-                </div>
-                <input 
-                  v-model="editForm.groupInput" 
-                  type="text" 
-                  placeholder="Type group name, press comma..." 
-                  class="group-input"
-                  @keydown="handleGroupKeydown($event, 'edit')"
-                  @blur="handleGroupBlur('edit')"
-                  list="edit-groups-list-rss"
-                  autocomplete="off"
-                />
-                <datalist id="edit-groups-list-rss">
-                  <option v-for="group in availableGroups" :key="group" :value="group" />
-                </datalist>
+              <label>Groups (optional)</label>
+              <div class="checkbox-group">
+                <label 
+                  v-for="group in groups" 
+                  :key="group.id"
+                  class="checkbox-option"
+                >
+                  <input 
+                    type="checkbox" 
+                    :value="group.id"
+                    v-model="editForm.groupIds"
+                  />
+                  <span>{{ group.name }}</span>
+                </label>
+                <p v-if="groups.length === 0" class="no-groups-hint">
+                  No groups available. Create a group in the Group Management section.
+                </p>
               </div>
             </div>
             <div class="form-group">
@@ -247,12 +286,12 @@
             </div>
             <div class="form-actions">
               <button type="button" @click="closeEditPanel" class="cancel-button">Cancel</button>
-              <button type="submit" class="submit-button">Save Changes</button>
+              <button type="submit" @click.prevent="saveEdit" class="submit-button">Save Changes</button>
             </div>
           </form>
 
           <!-- GitHub Edit Form -->
-          <form v-if="editingSource && editingSource.source_type === 'github'" @submit.prevent="saveEdit" class="source-form">
+          <form v-if="editingSource && editingSource.source_type === 'github'" @submit.prevent="saveEdit" class="source-form" novalidate>
             <div class="form-group">
               <label>Name</label>
               <input v-model="editForm.name" type="text" required placeholder="e.g., My Project" />
@@ -276,35 +315,23 @@
               </label>
             </div>
             <div class="form-group">
-              <label>Groups (optional) - Type groups separated by commas</label>
-              <div class="group-input-container">
-                <div class="group-pills">
-                  <span 
-                    v-for="(group, index) in parseGroups(editForm.group)" 
-                    :key="index" 
-                    class="group-pill"
-                  >
-                    {{ group }}
-                    <button 
-                      type="button"
-                      @click="removeGroup('edit', index)"
-                      class="pill-remove"
-                    >×</button>
-                  </span>
-                </div>
-                <input 
-                  v-model="editForm.groupInput" 
-                  type="text" 
-                  placeholder="Type group name, press comma..." 
-                  class="group-input"
-                  @keydown="handleGroupKeydown($event, 'edit')"
-                  @blur="handleGroupBlur('edit')"
-                  list="edit-groups-list-github"
-                  autocomplete="off"
-                />
-                <datalist id="edit-groups-list-github">
-                  <option v-for="group in availableGroups" :key="group" :value="group" />
-                </datalist>
+              <label>Groups (optional)</label>
+              <div class="checkbox-group">
+                <label 
+                  v-for="group in groups" 
+                  :key="group.id"
+                  class="checkbox-option"
+                >
+                  <input 
+                    type="checkbox" 
+                    :value="group.id"
+                    v-model="editForm.groupIds"
+                  />
+                  <span>{{ group.name }}</span>
+                </label>
+                <p v-if="groups.length === 0" class="no-groups-hint">
+                  No groups available. Create a group in the Group Management section.
+                </p>
               </div>
             </div>
             <div class="form-group">
@@ -315,7 +342,57 @@
             </div>
             <div class="form-actions">
               <button type="button" @click="closeEditPanel" class="cancel-button">Cancel</button>
-              <button type="submit" class="submit-button">Save Changes</button>
+              <button type="submit" @click.prevent="saveEdit" class="submit-button">Save Changes</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add/Edit Group Panel -->
+    <div v-if="editingGroup !== null" class="edit-panel-overlay" @click="closeGroupPanel">
+      <div class="edit-panel" @click.stop>
+        <div class="edit-panel-header">
+          <h2>{{ editingGroup.id ? 'Edit Group' : 'Add Group' }}</h2>
+          <button @click="closeGroupPanel" class="close-button" title="Close">×</button>
+        </div>
+        
+        <div class="edit-panel-content">
+          <form @submit.prevent="saveGroup" class="source-form" novalidate>
+            <div class="form-group">
+              <label>Group Name</label>
+              <input 
+                v-model="groupForm.name" 
+                type="text" 
+                required 
+                placeholder="e.g., Work, Personal, etc." 
+              />
+            </div>
+            <div v-if="editingGroup && editingGroup.id" class="form-group">
+              <label>Sources in this Group</label>
+              <div class="checkbox-group">
+                <label 
+                  v-for="source in sources" 
+                  :key="source.id"
+                  class="checkbox-option"
+                >
+                  <input 
+                    type="checkbox" 
+                    :value="source.id"
+                    v-model="groupForm.sourceIds"
+                  />
+                  <span>{{ source.name }}</span>
+                </label>
+                <p v-if="sources.length === 0" class="no-groups-hint">
+                  No sources available.
+                </p>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="button" @click="closeGroupPanel" class="cancel-button">Cancel</button>
+              <button type="submit" class="submit-button">
+                {{ editingGroup.id ? 'Save Changes' : 'Create Group' }}
+              </button>
             </div>
           </form>
         </div>
@@ -325,37 +402,32 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useSources } from '../composables/useSources';
+import { useGroups } from '../composables/useGroups';
 import { ask, MessageDialogOptions } from '@tauri-apps/plugin-dialog';
-import type { Source, SourceInput, UpdateSourceInput } from '../types';
+import type { Source, SourceInput, UpdateSourceInput, Group } from '../types';
 
-const { sources, loading, error, fetchSources, addSource, updateSource, removeSource: removeSourceAction, syncSource } = useSources();
+const { sources, loading, error, fetchSources, addSource, updateSource, removeSource: removeSourceAction, syncSource, syncAllSources } = useSources();
+const { groups, fetchGroups, addGroup, updateGroup, removeGroup: removeGroupAction } = useGroups();
 
 const syncingSources = ref<Set<number>>(new Set());
 const deletingSources = ref<Set<number>>(new Set());
+const syncingAll = ref(false);
 const editingSource = ref<Source | null>(null);
+const showAddSourceModal = ref(false);
+const editingGroup = ref<Group | { id: null; name: string } | null>(null);
+const savingGroup = ref(false);
+const savingSource = ref(false);
+const addingSource = ref(false);
 
 const newSourceType = ref<'rss' | 'github'>('rss');
-
-// Get available groups from existing sources (parse comma-separated)
-const availableGroups = computed(() => {
-  const groups = new Set<string>();
-  sources.value.forEach(source => {
-    if (source.group) {
-      const parsed = source.group.split(',').map(g => g.trim()).filter(g => g.length > 0);
-      parsed.forEach(g => groups.add(g));
-    }
-  });
-  return Array.from(groups).sort();
-});
 
 const rssForm = ref({
   name: '',
   url: '',
   pollInterval: '10m',
-  group: '',
-  groupInput: '',
+  groupIds: [] as number[],
 });
 
 const githubForm = ref({
@@ -364,11 +436,9 @@ const githubForm = ref({
   repo: '',
   token: '',
   assignedOnly: false,
-  group: '',
-  groupInput: '',
+  groupIds: [] as number[],
 });
 
-// Edit form - will be populated when editing
 const editForm = ref({
   name: '',
   url: '',
@@ -377,53 +447,134 @@ const editForm = ref({
   repo: '',
   token: '',
   assignedOnly: false,
-  group: '',
-  groupInput: '',
+  groupIds: [] as number[],
   enabled: true,
 });
 
-const addRssSource = async () => {
-  const source: SourceInput = {
-    source_type: 'rss',
-    name: rssForm.value.name,
-    config_json: {
-      url: rssForm.value.url,
-      poll_interval: rssForm.value.pollInterval || '10m',
-    },
-    group: rssForm.value.group || null,
-  };
+const groupForm = ref({
+  name: '',
+  sourceIds: [] as number[],
+});
 
-  await addSource(source);
-  
-  // Reset form
-  rssForm.value = { name: '', url: '', pollInterval: '10m', group: '', groupInput: '' };
+// Get group names for a source
+const getSourceGroupNames = (source: Source): string[] => {
+  if (!source.group_ids || source.group_ids.length === 0) {
+    return [];
+  }
+  return source.group_ids
+    .map(id => groups.value.find(g => g.id === id)?.name)
+    .filter((name): name is string => name !== undefined);
 };
 
-const addGitHubSource = async () => {
-  const source: SourceInput = {
-    source_type: 'github',
-    name: githubForm.value.name,
-    config_json: {
-      owner: githubForm.value.owner,
-      repo: githubForm.value.repo,
-      assigned_only: githubForm.value.assignedOnly,
-    },
-    token: githubForm.value.token,
-    group: githubForm.value.group || null,
-  };
-
-  await addSource(source);
-  
-  // Reset form
-  githubForm.value = { name: '', owner: '', repo: '', token: '', assignedOnly: false, group: '', groupInput: '' };
+// Get count of sources using a group
+const getGroupSourceCount = (groupId: number): number => {
+  return sources.value.filter(s => s.group_ids?.includes(groupId)).length;
 };
 
-const toggleSource = async (id: number, enabled: boolean) => {
-  await updateSource(id, { enabled });
+
+const closeAddSourceModal = () => {
+  showAddSourceModal.value = false;
+};
+
+const addRssSource = async (e?: Event) => {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  
+  if (addingSource.value) return false;
+  
+  if (!rssForm.value.name.trim()) {
+    alert('Please enter a source name');
+    return false;
+  }
+  if (!rssForm.value.url.trim()) {
+    alert('Please enter a URL');
+    return false;
+  }
+  
+  addingSource.value = true;
+  try {
+    const source: SourceInput = {
+      source_type: 'rss',
+      name: rssForm.value.name,
+      config_json: {
+        url: rssForm.value.url,
+        poll_interval: rssForm.value.pollInterval || '10m',
+      },
+      group_ids: rssForm.value.groupIds.length > 0 ? rssForm.value.groupIds : null,
+    };
+
+    await addSource(source);
+    await fetchGroups();
+    await fetchSources();
+    closeAddSourceModal();
+    
+    // Reset form
+    rssForm.value = { name: '', url: '', pollInterval: '10m', groupIds: [] };
+    return false;
+  } catch (e) {
+    const errorMsg = e instanceof Error ? e.message : String(e);
+    alert(`Failed to add source: ${errorMsg}`);
+    return false;
+  } finally {
+    addingSource.value = false;
+  }
+};
+
+const addGitHubSource = async (e?: Event) => {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  
+  if (addingSource.value) return false;
+  
+  if (!githubForm.value.name.trim()) {
+    alert('Please enter a source name');
+    return false;
+  }
+  if (!githubForm.value.owner.trim()) {
+    alert('Please enter an owner');
+    return false;
+  }
+  if (!githubForm.value.repo.trim()) {
+    alert('Please enter a repository name');
+    return false;
+  }
+  
+  addingSource.value = true;
+  try {
+    const source: SourceInput = {
+      source_type: 'github',
+      name: githubForm.value.name,
+      config_json: {
+        owner: githubForm.value.owner,
+        repo: githubForm.value.repo,
+        assigned_only: githubForm.value.assignedOnly,
+      },
+      token: githubForm.value.token,
+      group_ids: githubForm.value.groupIds.length > 0 ? githubForm.value.groupIds : null,
+    };
+
+    await addSource(source);
+    await fetchGroups();
+    await fetchSources();
+    closeAddSourceModal();
+    
+    // Reset form
+    githubForm.value = { name: '', owner: '', repo: '', token: '', assignedOnly: false, groupIds: [] };
+    return false;
+  } catch (e) {
+    const errorMsg = e instanceof Error ? e.message : String(e);
+    alert(`Failed to add source: ${errorMsg}`);
+    return false;
+  } finally {
+    addingSource.value = false;
+  }
 };
 
 const editSource = (source: Source) => {
-  console.log('Editing source:', source);
   editingSource.value = source;
   
   // Parse config_json if it's a string
@@ -439,29 +590,24 @@ const editSource = (source: Source) => {
     config = source.config_json || {};
   }
   
-  // Populate edit form based on source type
+  // Populate edit form
   editForm.value.name = source.name;
   editForm.value.enabled = source.enabled;
-  editForm.value.group = source.group || '';
-  editForm.value.groupInput = '';
+  editForm.value.groupIds = source.group_ids || [];
   
   if (source.source_type === 'rss') {
     editForm.value.url = config.url || '';
     editForm.value.pollInterval = config.poll_interval || '10m';
-    console.log('RSS form populated:', editForm.value);
   } else if (source.source_type === 'github') {
     editForm.value.owner = config.owner || '';
     editForm.value.repo = config.repo || '';
     editForm.value.assignedOnly = config.assigned_only || false;
-    // Token is stored separately, so we leave it blank (user can update if needed)
     editForm.value.token = '';
-    console.log('GitHub form populated:', editForm.value);
   }
 };
 
 const closeEditPanel = () => {
   editingSource.value = null;
-  // Reset form
   editForm.value = {
     name: '',
     url: '',
@@ -470,143 +616,68 @@ const closeEditPanel = () => {
     repo: '',
     token: '',
     assignedOnly: false,
-    group: '',
-    groupInput: '',
+    groupIds: [],
     enabled: true,
   };
 };
 
-// Parse comma-separated groups
-const parseGroups = (groupString: string | null | undefined): string[] => {
-  if (!groupString) return [];
-  return groupString.split(',').map(g => g.trim()).filter(g => g.length > 0);
-};
-
-// Handle group input keydown
-const handleGroupKeydown = (event: KeyboardEvent, formType: 'rss' | 'github' | 'edit') => {
-  if (event.key === ',' || event.key === 'Enter') {
-    event.preventDefault();
-    addGroupFromInput(formType);
-  } else if (event.key === 'Backspace') {
-    const form = formType === 'rss' ? rssForm.value : formType === 'github' ? githubForm.value : editForm.value;
-    if (form.groupInput === '' && form.group) {
-      // Remove last group if input is empty
-      const groups = parseGroups(form.group);
-      if (groups.length > 0) {
-        groups.pop();
-        form.group = groups.join(', ');
-        if (formType === 'rss') {
-          rssForm.value = { ...rssForm.value, group: form.group };
-        } else if (formType === 'github') {
-          githubForm.value = { ...githubForm.value, group: form.group };
-        } else {
-          editForm.value = { ...editForm.value, group: form.group };
-        }
-      }
-    }
+const saveEdit = async (e?: Event) => {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
   }
-};
-
-// Handle group input blur
-const handleGroupBlur = (formType: 'rss' | 'github' | 'edit') => {
-  const form = formType === 'rss' ? rssForm.value : formType === 'github' ? githubForm.value : editForm.value;
-  if (form.groupInput.trim()) {
-    addGroupFromInput(formType);
-  }
-};
-
-// Add group from input
-const addGroupFromInput = async (formType: 'rss' | 'github' | 'edit') => {
-  const form = formType === 'rss' ? rssForm.value : formType === 'github' ? githubForm.value : editForm.value;
-  const input = form.groupInput.trim();
-  if (input) {
-    const groups = parseGroups(form.group);
-    if (!groups.includes(input)) {
-      groups.push(input);
-      const newGroupString = groups.join(', ');
-      form.group = newGroupString;
-      form.groupInput = '';
-      
-      if (formType === 'rss') {
-        rssForm.value = { ...rssForm.value, group: newGroupString, groupInput: '' };
-      } else if (formType === 'github') {
-        githubForm.value = { ...githubForm.value, group: newGroupString, groupInput: '' };
-      } else {
-        // In edit mode, immediately save to database
-        editForm.value = { ...editForm.value, group: newGroupString, groupInput: '' };
-        if (editingSource.value) {
-          try {
-            await updateSource(editingSource.value.id, { 
-              group: newGroupString || null 
-            });
-            // Refresh sources to update available groups
-            await fetchSources();
-          } catch (e) {
-            console.error('Failed to update source groups:', e);
-            // Revert on error
-            const groups = parseGroups(editingSource.value.group || '');
-            groups.pop(); // Remove the group we just added
-            editForm.value.group = groups.join(', ');
-          }
-        }
-      }
-    } else {
-      form.groupInput = '';
-    }
-  }
-};
-
-// Remove group by index
-const removeGroup = async (formType: 'rss' | 'github' | 'edit', index: number) => {
-  const form = formType === 'rss' ? rssForm.value : formType === 'github' ? githubForm.value : editForm.value;
-  const groups = parseGroups(form.group);
-  if (index < 0 || index >= groups.length) return; // Safety check
-  groups.splice(index, 1);
-  const newGroupString = groups.length > 0 ? groups.join(', ') : '';
-  form.group = newGroupString;
   
-  if (formType === 'rss') {
-    rssForm.value = { ...rssForm.value, group: newGroupString };
-  } else if (formType === 'github') {
-    githubForm.value = { ...githubForm.value, group: newGroupString };
-  } else {
-    // In edit mode, immediately save to database
-    editForm.value = { ...editForm.value, group: newGroupString };
-    if (editingSource.value) {
-      try {
-        // Pass empty string to clear groups (backend will treat empty string as NULL)
-        // We need to pass an empty string, not null, because JSON null deserializes to None (don't update)
-        // but we want to update to NULL, so we pass "" and let backend handle it
-        const groupValue = newGroupString.trim() === '' ? '' : newGroupString;
-        await updateSource(editingSource.value.id, { 
-          group: groupValue
-        });
-        // Refresh sources to update available groups and update editingSource
-        await fetchSources();
-        // Update editingSource to reflect the change
-        const updatedSource = sources.value.find(s => s.id === editingSource.value!.id);
-        if (updatedSource) {
-          editingSource.value = updatedSource;
-          editForm.value.group = updatedSource.group || '';
-        }
-      } catch (e) {
-        console.error('Failed to update source groups:', e);
-        // Revert on error
-        editForm.value.group = editingSource.value.group || '';
-      }
+  console.log('saveEdit called', { savingSource: savingSource.value, editingSource: editingSource.value });
+  
+  if (savingSource.value) {
+    console.log('Already saving, returning');
+    return false;
+  }
+  if (!editingSource.value) {
+    console.log('No editing source, returning');
+    return false;
+  }
+  
+  if (!editForm.value.name.trim()) {
+    alert('Please enter a source name');
+    return false;
+  }
+  
+  if (editingSource.value.source_type === 'rss' && !editForm.value.url.trim()) {
+    alert('Please enter a URL');
+    return false;
+  }
+  
+  if (editingSource.value.source_type === 'github') {
+    if (!editForm.value.owner.trim()) {
+      alert('Please enter an owner');
+      return false;
+    }
+    if (!editForm.value.repo.trim()) {
+      alert('Please enter a repository name');
+      return false;
     }
   }
-};
-
-const saveEdit = async () => {
-  if (!editingSource.value) return;
   
+  savingSource.value = true;
   try {
+    console.log('Starting save, form data:', editForm.value);
+    // Convert Proxy array to plain array to ensure proper serialization
+    const groupIds = Array.isArray(editForm.value.groupIds) 
+      ? [...editForm.value.groupIds] 
+      : [];
+    
+    console.log('Group IDs (plain array):', groupIds, 'Type:', typeof groupIds, 'IsArray:', Array.isArray(groupIds));
+    
     const update: UpdateSourceInput = {
       name: editForm.value.name,
       enabled: editForm.value.enabled,
-      group: editForm.value.group || null,
+      // Rust expects Option<Vec<i64>>: None = don't update, Some([]) = clear, Some([1,2]) = set
+      // Always send the array (even if empty) to update groups
+      group_ids: groupIds,
     };
+    
+    console.log('Update object before serialization:', JSON.stringify(update, null, 2));
     
     if (editingSource.value.source_type === 'rss') {
       update.config_json = {
@@ -619,29 +690,48 @@ const saveEdit = async () => {
         repo: editForm.value.repo,
         assigned_only: editForm.value.assignedOnly,
       };
-      // Only update token if a new one was provided
       if (editForm.value.token) {
         update.token = editForm.value.token;
       }
     }
     
-    await updateSource(editingSource.value.id, update);
+    console.log('Calling updateSource with:', { id: editingSource.value.id, update });
+    // Update the source
+    try {
+      await updateSource(editingSource.value.id, update);
+      console.log('updateSource completed successfully');
+    } catch (updateError) {
+      console.error('updateSource threw error:', updateError);
+      throw updateError;
+    }
+    
+    console.log('Refreshing data...');
+    // Refresh data
+    await fetchGroups();
+    console.log('fetchGroups completed');
+    await fetchSources();
+    console.log('fetchSources completed');
+    
+    console.log('Closing panel...');
+    // Close panel only after successful update
     closeEditPanel();
+    console.log('Panel closed');
+    return false;
   } catch (e) {
+    console.error('Error in saveEdit catch block:', e);
     const errorMsg = e instanceof Error ? e.message : String(e);
-    console.error('Failed to update source:', e);
+    alert(`Failed to update source: ${errorMsg}`);
     error.value = `Failed to update source: ${errorMsg}`;
+    return false;
+  } finally {
+    savingSource.value = false;
+    console.log('saveEdit finally block - savingSource set to false');
   }
 };
 
 const removeSource = async (id: number) => {
-  console.log('=== DELETE SOURCE START ===');
-  console.log('removeSource called with id:', id);
-  
-  // Find source name for feedback
   const sourceName = sources.value.find(s => s.id === id)?.name || 'source';
   
-  // Show confirmation dialog using Tauri's dialog plugin
   const confirmed = await ask(
     `Are you sure you want to remove the source: ${sourceName}? This will also delete all items from this source.`,
     {
@@ -652,34 +742,18 @@ const removeSource = async (id: number) => {
     } as MessageDialogOptions
   );
   
-  console.log('User confirmed:', confirmed);
+  if (!confirmed) return;
   
-  if (!confirmed) {
-    console.log('User cancelled deletion');
-    return;
-  }
-  
-  console.log('Starting deletion process...');
   deletingSources.value.add(id);
   
   try {
-    console.log('Calling removeSourceAction with id:', id);
     await removeSourceAction(id);
-    console.log('removeSourceAction completed successfully');
-    
-    // Force refresh to ensure UI updates
-    console.log('Refreshing sources list...');
     await fetchSources();
-    console.log('Sources list refreshed. Current sources:', sources.value.map(s => ({ id: s.id, name: s.name })));
-    
-    console.log(`Source "${sourceName}" deleted successfully`);
   } catch (e) {
     const errorMsg = e instanceof Error ? e.message : String(e);
-    console.error('=== DELETE SOURCE ERROR ===', e);
     error.value = `Failed to remove source: ${errorMsg}`;
   } finally {
     deletingSources.value.delete(id);
-    console.log('=== DELETE SOURCE END ===');
   }
 };
 
@@ -687,12 +761,7 @@ const handleSyncSource = async (id: number) => {
   syncingSources.value.add(id);
   try {
     await syncSource(id);
-    // Show success feedback
-    const source = sources.value.find(s => s.id === id);
-    if (source) {
-      // Force refresh to show updated sync time
-      await fetchSources();
-    }
+    await fetchSources();
   } catch (e) {
     const errorMsg = e instanceof Error ? e.message : String(e);
     console.error('Failed to sync source:', e);
@@ -702,13 +771,148 @@ const handleSyncSource = async (id: number) => {
   }
 };
 
+const handleSyncAll = async () => {
+  syncingAll.value = true;
+  try {
+    await syncAllSources();
+    await fetchSources();
+  } catch (e) {
+    const errorMsg = e instanceof Error ? e.message : String(e);
+    console.error('Failed to sync all sources:', e);
+    alert(`Failed to sync all sources: ${errorMsg}`);
+  } finally {
+    syncingAll.value = false;
+  }
+};
+
+const openAddGroupPanel = () => {
+  editingGroup.value = { id: null, name: '' };
+  groupForm.value.name = '';
+  groupForm.value.sourceIds = [];
+};
+
+const editGroup = (group: Group) => {
+  editingGroup.value = group;
+  groupForm.value.name = group.name;
+  // Get sources that belong to this group
+  groupForm.value.sourceIds = sources.value
+    .filter(s => s.group_ids?.includes(group.id))
+    .map(s => s.id);
+};
+
+const closeGroupPanel = () => {
+  editingGroup.value = null;
+  groupForm.value.name = '';
+  groupForm.value.sourceIds = [];
+};
+
+const saveGroup = async (e?: Event) => {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  
+  if (savingGroup.value) return false;
+  if (!editingGroup.value) return false;
+  
+  if (!groupForm.value.name.trim()) {
+    alert('Please enter a group name');
+    return false;
+  }
+  
+  savingGroup.value = true;
+  try {
+    let groupId: number;
+    if (editingGroup.value.id) {
+      // Update existing group
+      await updateGroup(editingGroup.value.id, groupForm.value.name);
+      groupId = editingGroup.value.id;
+      
+      // Update source-group relationships
+      for (const source of sources.value) {
+        const shouldHaveGroup = groupForm.value.sourceIds.includes(source.id);
+        const currentlyHasGroup = source.group_ids?.includes(groupId) || false;
+        
+        if (shouldHaveGroup && !currentlyHasGroup) {
+          const newGroupIds = [...(source.group_ids || []), groupId];
+          await updateSource(source.id, { group_ids: newGroupIds });
+        } else if (!shouldHaveGroup && currentlyHasGroup) {
+            const newGroupIds = (source.group_ids || []).filter(id => id !== groupId);
+            await updateSource(source.id, { group_ids: newGroupIds.length > 0 ? newGroupIds : [] });
+        }
+      }
+    } else {
+      // Create new group
+      groupId = await addGroup(groupForm.value.name);
+      
+      // Assign sources to the new group
+      if (groupForm.value.sourceIds.length > 0) {
+        await fetchGroups();
+        for (const sourceId of groupForm.value.sourceIds) {
+          const source = sources.value.find(s => s.id === sourceId);
+          if (source) {
+            const newGroupIds = [...(source.group_ids || []), groupId];
+            await updateSource(sourceId, { group_ids: newGroupIds });
+          }
+        }
+      }
+    }
+    
+    closeGroupPanel();
+    await fetchGroups();
+    await fetchSources();
+    return false;
+  } catch (e) {
+    const errorMsg = e instanceof Error ? e.message : String(e);
+    alert(`Failed to save group: ${errorMsg}`);
+    return false;
+  } finally {
+    savingGroup.value = false;
+  }
+};
+
+const removeGroup = async (id: number) => {
+  const group = groups.value.find(g => g.id === id);
+  if (!group) return;
+  
+  const sourceCount = getGroupSourceCount(id);
+  const confirmed = await ask(
+    `Are you sure you want to delete the group "${group.name}"?${sourceCount > 0 ? ` This will remove it from ${sourceCount} source${sourceCount !== 1 ? 's' : ''}.` : ''}`,
+    {
+      title: 'Delete Group',
+      kind: 'warning',
+      okLabel: 'Confirm',
+      cancelLabel: 'Cancel',
+    } as MessageDialogOptions
+  );
+  
+  if (!confirmed) return;
+  
+  try {
+    console.log('removeGroup: calling removeGroupAction with id:', id);
+    await removeGroupAction(id);
+    console.log('removeGroup: removeGroupAction completed');
+    await fetchGroups();
+    console.log('removeGroup: fetchGroups completed');
+    await fetchSources();
+    console.log('removeGroup: fetchSources completed');
+  } catch (e) {
+    console.error('removeGroup: error caught:', e);
+    const errorMsg = e instanceof Error ? e.message : String(e);
+    alert(`Failed to remove group: ${errorMsg}`);
+    error.value = `Failed to remove group: ${errorMsg}`;
+  }
+};
+
+
 const formatDate = (timestamp: number) => {
   const date = new Date(timestamp * 1000);
   return date.toLocaleString();
 };
 
-onMounted(() => {
-  fetchSources();
+onMounted(async () => {
+  await fetchSources();
+  await fetchGroups();
 });
 </script>
 
@@ -717,6 +921,61 @@ onMounted(() => {
   padding: 20px;
   max-width: 1000px;
   margin: 0 auto;
+}
+
+.sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: white;
+  padding: 12px 20px;
+  margin: -20px -20px 20px -20px;
+  border-bottom: 1px solid #e0e0e0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.95);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-left h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.action-button {
+  padding: 8px 16px;
+  border: 1px solid #ddd;
+  background: white;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.action-button.primary {
+  background: #396cd8;
+  color: white;
+  border-color: #396cd8;
+}
+
+.action-button:hover:not(:disabled) {
+  background: #f5f5f5;
+}
+
+.action-button.primary:hover:not(:disabled) {
+  background: #2952b8;
+}
+
+.action-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .loading {
@@ -749,37 +1008,6 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   line-height: 1;
-}
-
-.dismiss-error:hover {
-  background: rgba(211, 47, 47, 0.1);
-  border-radius: 50%;
-}
-
-.error-message {
-  background: #ffebee;
-  border: 1px solid #d32f2f;
-  color: #d32f2f;
-  padding: 12px 16px;
-  border-radius: 4px;
-  margin-bottom: 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.dismiss-error {
-  background: none;
-  border: none;
-  color: #d32f2f;
-  font-size: 20px;
-  cursor: pointer;
-  padding: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .dismiss-error:hover {
@@ -827,34 +1055,41 @@ onMounted(() => {
 
 .source-actions {
   display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.toggle {
-  display: flex;
-  align-items: center;
   gap: 8px;
-  cursor: pointer;
+  align-items: center;
 }
 
-.sync-button, .edit-button, .delete-button {
-  padding: 6px 12px;
+.icon-button {
+  padding: 6px 10px;
   border: 1px solid #ddd;
   background: white;
   cursor: pointer;
   border-radius: 4px;
-  font-size: 14px;
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
 }
 
-.sync-button:disabled, .edit-button:disabled, .delete-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.icon-button:hover:not(:disabled) {
+  background: #f5f5f5;
 }
 
-.delete-button {
+.icon-button.delete {
   color: #d32f2f;
   border-color: #d32f2f;
+}
+
+.icon-button.delete:hover:not(:disabled) {
+  background: #ffebee;
+}
+
+.icon-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .source-info {
@@ -862,9 +1097,66 @@ onMounted(() => {
   color: #666;
 }
 
-.add-source-section {
+.group-management-section {
   border-top: 2px solid #ddd;
-  padding-top: 20px;
+  margin-top: 20px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.section-header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+  font-style: italic;
+}
+
+.groups-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.group-card {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 16px;
+  background: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.group-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.group-name {
+  font-weight: 500;
+  font-size: 16px;
+}
+
+.group-count {
+  font-size: 12px;
+  color: #666;
+}
+
+.group-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .tabs {
@@ -888,7 +1180,8 @@ onMounted(() => {
 }
 
 .source-form {
-  max-width: 500px;
+  max-width: 100%;
+  width: 100%;
 }
 
 .form-group {
@@ -909,78 +1202,59 @@ onMounted(() => {
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 14px;
+  box-sizing: border-box;
 }
 
 .form-group input[type="checkbox"] {
   margin-right: 8px;
 }
 
-.group-input-container {
+
+.checkbox-group {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 8px;
   border: 1px solid #ddd;
   border-radius: 4px;
-  padding: 8px;
+  background: #f9f9f9;
+}
+
+@media (max-width: 768px) {
+  .checkbox-group {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .checkbox-group {
+    grid-template-columns: 1fr;
+  }
+}
+
+.checkbox-option {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
   align-items: center;
-  min-height: 40px;
-  background: white;
-}
-
-.group-input-container:focus-within {
-  border-color: #396cd8;
-  outline: none;
-}
-
-.group-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-}
-
-.group-pill {
-  background: #e3f2fd;
-  color: #1976d2;
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 500;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.pill-remove {
-  background: none;
-  border: none;
-  color: #1976d2;
+  gap: 8px;
   cursor: pointer;
-  font-size: 16px;
-  line-height: 1;
-  padding: 0;
-  width: 16px;
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: background 0.2s;
+  padding: 4px;
 }
 
-.pill-remove:hover {
-  background: rgba(25, 118, 210, 0.2);
+.checkbox-option:hover {
+  background: #f0f0f0;
+  border-radius: 4px;
 }
 
-.group-input {
-  flex: 1;
-  min-width: 120px;
-  border: none;
-  outline: none;
-  padding: 4px 8px;
-  font-size: 14px;
-  background: transparent;
+.no-groups-hint {
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
+  margin: 0;
+  padding: 8px;
 }
+
 
 .submit-button {
   padding: 10px 20px;
@@ -997,7 +1271,6 @@ onMounted(() => {
   background: #2952b8;
 }
 
-/* Edit Panel Styles */
 .edit-panel-overlay {
   position: fixed;
   top: 0;
@@ -1090,11 +1363,6 @@ onMounted(() => {
   padding: 20px;
   flex: 1;
   overflow-y: auto;
-}
-
-.edit-panel-content .source-form {
-  max-width: 100%;
-  width: 100%;
 }
 
 .form-actions {
