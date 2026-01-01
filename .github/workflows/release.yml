@@ -12,7 +12,7 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     outputs:
-      release_id: ${{ steps.release.outputs.id }}
+      release_id: ${{ steps.release_id.outputs.id }}
     steps:
       - uses: actions/checkout@v4
       - name: setup node
@@ -21,16 +21,55 @@ jobs:
           node-version: 20
       - name: get version
         run: echo "PACKAGE_VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_ENV
-      - name: create release
+      - name: check for changelog
+        id: changelog
+        run: |
+          if [ -f CHANGELOG.md ]; then
+            VERSION="${{ github.ref_name }}"
+            # Check if this version exists in CHANGELOG.md
+            if grep -qE "^## \[?$VERSION\]?" CHANGELOG.md || grep -qE "^## $VERSION" CHANGELOG.md; then
+              echo "has_changelog=true" >> $GITHUB_OUTPUT
+              # Extract changelog section for this version
+              # Match from ## [v0.0.1] or ## v0.0.1 until next ## or end of file
+              awk "/^## \[?$VERSION\]?/,/^## / {if (NR > 1 && /^## /) exit; print}" CHANGELOG.md > changelog_section.md || \
+              awk "/^## \[?$VERSION\]?/,EOF {print}" CHANGELOG.md > changelog_section.md
+            else
+              echo "has_changelog=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "has_changelog=false" >> $GITHUB_OUTPUT
+          fi
+      - name: create release with changelog
+        if: steps.changelog.outputs.has_changelog == 'true'
         id: release
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ github.ref_name }}
-          release_name: UmbraRelay ${{ github.ref_name }}
+          name: UmbraRelay ${{ github.ref_name }}
           draft: true
           prerelease: false
+          body_path: changelog_section.md
+      - name: create release with auto-generated notes
+        if: steps.changelog.outputs.has_changelog != 'true'
+        id: release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: UmbraRelay ${{ github.ref_name }}
+          draft: true
+          prerelease: false
+          generate_release_notes: true
+      - name: get release id
+        id: release_id
+        run: |
+          RELEASE_ID=$(gh api repos/${{ github.repository }}/releases/tags/${{ github.ref_name }} --jq .id)
+          echo "id=$RELEASE_ID" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-tauri:
     needs: create-release

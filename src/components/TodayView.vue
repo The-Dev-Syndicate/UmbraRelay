@@ -140,7 +140,7 @@ const emit = defineEmits<{
 }>();
 
 const { items, loading, error, fetchItems, updateItemState } = useItems();
-const { sources, fetchSources } = useSources();
+const { fetchSources } = useSources();
 const currentFilter = ref<string | null>(null);
 const selectedGroups = ref<string[]>([]);
 const showGroupDropdown = ref(false);
@@ -231,12 +231,6 @@ const applyGroupFilter = () => {
   }, 200);
 };
 
-const removeGroup = (group: string) => {
-  const index = selectedGroups.value.indexOf(group);
-  if (index > -1) {
-    selectedGroups.value.splice(index, 1);
-  }
-};
 
 const clearAllGroups = () => {
   selectedGroups.value = [];

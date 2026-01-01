@@ -98,6 +98,7 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { useCustomViews } from '../composables/useCustomViews';
 import { useSources } from '../composables/useSources';
+import { useGroups } from '../composables/useGroups';
 import type { CustomViewInput } from '../types';
 
 const props = defineProps<{
@@ -111,6 +112,7 @@ const emit = defineEmits<{
 
 const { createCustomView, updateCustomView, getCustomView, error: viewError } = useCustomViews();
 const { sources, fetchSources } = useSources();
+const { groups, fetchGroups } = useGroups();
 
 const form = ref<CustomViewInput>({
   name: '',
@@ -122,16 +124,9 @@ const saving = ref(false);
 const error = ref<string | null>(null);
 const editingViewId = computed(() => props.viewId);
 
-// Get available groups from sources
+// Get available groups from groups list
 const availableGroups = computed(() => {
-  const groups = new Set<string>();
-  sources.value.forEach(source => {
-    if (source.group) {
-      const parsed = source.group.split(',').map(g => g.trim()).filter(g => g.length > 0);
-      parsed.forEach(g => groups.add(g));
-    }
-  });
-  return Array.from(groups).sort();
+  return groups.value.map(g => g.name).sort();
 });
 
 const allSourcesSelected = computed(() => {
@@ -232,6 +227,7 @@ watch(viewError, (newError) => {
 
 onMounted(() => {
   fetchSources();
+  fetchGroups();
   loadView();
 });
 </script>

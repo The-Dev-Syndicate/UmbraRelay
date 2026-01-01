@@ -236,12 +236,6 @@ const applyGroupFilter = () => {
   }, 200);
 };
 
-const removeGroup = (group: string) => {
-  const index = selectedGroups.value.indexOf(group);
-  if (index > -1) {
-    selectedGroups.value.splice(index, 1);
-  }
-};
 
 const clearAllGroups = () => {
   selectedGroups.value = [];

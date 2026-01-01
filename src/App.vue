@@ -143,7 +143,7 @@
       />
       <InboxView
         v-else-if="currentViewType === 'source' && !selectedItemId"
-        :source-id="currentSourceId"
+        :source-id="currentSourceId ?? undefined"
         @select-item="selectItem"
         :key="`source-${currentSourceId}`"
       />
