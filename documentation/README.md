@@ -22,6 +22,7 @@ Welcome to the UmbraRelay documentation. UmbraRelay is a local-first desktop inb
 - [Normalization](technical/normalization.md) - Deduplication and normalization logic
 - [API Reference](technical/api-reference.md) - Tauri command API reference
 - [Development](technical/development.md) - Development setup and contribution guide
+- [Release Process](technical/release-process.md) - Creating and publishing releases
 
 ### Examples
 - [Source Setup Examples](examples/config-examples.md) - Example source configurations

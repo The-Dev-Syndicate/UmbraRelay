@@ -66,6 +66,12 @@ UmbraRelay/
 npm run tauri dev
 ```
 
+Or using the Makefile:
+
+```bash
+make start-dev
+```
+
 ### Production Build
 
 ```bash
@@ -76,6 +82,15 @@ Outputs:
 - **macOS**: `.app` bundle
 - **Windows**: `.msi` installer
 - **Linux**: `.AppImage`
+
+### Creating Releases
+
+For information on creating releases, see the [Release Process](release-process.md) documentation.
+
+Quick reference:
+```bash
+make release VERSION=0.0.1
+```
 
 ## Testing
 

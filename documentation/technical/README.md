@@ -11,6 +11,7 @@ Technical documentation for developers and contributors.
 5. [API Reference](api-reference.md) - Tauri command API reference
 6. [Console Commands](console-commands.md) - Power user console commands
 7. [Development](development.md) - Development setup and contribution guide
+8. [Release Process](release-process.md) - Creating and publishing releases
 
 ## Target Audience
 
