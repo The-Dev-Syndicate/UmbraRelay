@@ -3,7 +3,7 @@
     <!-- Sticky Header -->
     <div class="sticky-header">
       <div class="header-left">
-        <h1>Sources</h1>
+    <h1>Sources</h1>
       </div>
       <div class="header-actions">
         <button @click="openAddGroupPanel" class="action-button">
@@ -122,41 +122,41 @@
     <div v-if="showAddSourceModal" class="edit-panel-overlay" @click="closeAddSourceModal">
       <div class="edit-panel" @click.stop>
         <div class="edit-panel-header">
-          <h2>Add Source</h2>
+      <h2>Add Source</h2>
           <button @click="closeAddSourceModal" class="close-button" title="Close">×</button>
         </div>
         
         <div class="edit-panel-content">
-          <div class="tabs">
-            <button
-              :class="{ active: newSourceType === 'rss' }"
-              @click="newSourceType = 'rss'"
-            >
-              RSS Feed
-            </button>
-            <button
-              :class="{ active: newSourceType === 'github' }"
-              @click="newSourceType = 'github'"
-            >
-              GitHub
-            </button>
-          </div>
+      <div class="tabs">
+        <button
+          :class="{ active: newSourceType === 'rss' }"
+          @click="newSourceType = 'rss'"
+        >
+          RSS Feed
+        </button>
+        <button
+          :class="{ active: newSourceType === 'github' }"
+          @click="newSourceType = 'github'"
+        >
+          GitHub
+        </button>
+      </div>
 
           <!-- RSS Form -->
           <form v-if="newSourceType === 'rss'" @submit.prevent="addRssSource" class="source-form" novalidate>
-            <div class="form-group">
-              <label>Name</label>
-              <input v-model="rssForm.name" type="text" required placeholder="e.g., Hacker News" />
-            </div>
-            <div class="form-group">
-              <label>URL</label>
-              <input v-model="rssForm.url" type="url" required placeholder="https://example.com/feed.xml" />
-            </div>
-            <div class="form-group">
-              <label>Poll Interval (optional)</label>
-              <input v-model="rssForm.pollInterval" type="text" placeholder="10m" />
-            </div>
-            <div class="form-group">
+        <div class="form-group">
+          <label>Name</label>
+          <input v-model="rssForm.name" type="text" required placeholder="e.g., Hacker News" />
+        </div>
+        <div class="form-group">
+          <label>URL</label>
+          <input v-model="rssForm.url" type="url" required placeholder="https://example.com/feed.xml" />
+        </div>
+        <div class="form-group">
+          <label>Poll Interval (optional)</label>
+          <input v-model="rssForm.pollInterval" type="text" placeholder="10m" />
+        </div>
+        <div class="form-group">
               <label>Groups (optional)</label>
               <div class="checkbox-group">
                 <label 
@@ -164,7 +164,7 @@
                   :key="group.id"
                   class="checkbox-option"
                 >
-                  <input 
+            <input 
                     type="checkbox" 
                     :value="group.id"
                     v-model="rssForm.groupIds"
@@ -174,39 +174,39 @@
                 <p v-if="groups.length === 0" class="no-groups-hint">
                   No groups available. Create a group in the Group Management section.
                 </p>
-              </div>
-            </div>
+          </div>
+        </div>
             <div class="form-actions">
               <button type="button" @click="closeAddSourceModal" class="cancel-button">Cancel</button>
-              <button type="submit" class="submit-button">Add RSS Feed</button>
+        <button type="submit" class="submit-button">Add RSS Feed</button>
             </div>
-          </form>
+      </form>
 
           <!-- GitHub Form -->
           <form v-if="newSourceType === 'github'" @submit.prevent="addGitHubSource" class="source-form" novalidate>
-            <div class="form-group">
-              <label>Name</label>
-              <input v-model="githubForm.name" type="text" required placeholder="e.g., My Project" />
-            </div>
-            <div class="form-group">
-              <label>Owner</label>
-              <input v-model="githubForm.owner" type="text" required placeholder="username or org" />
-            </div>
-            <div class="form-group">
-              <label>Repository</label>
-              <input v-model="githubForm.repo" type="text" required placeholder="repo-name" />
-            </div>
-            <div class="form-group">
-              <label>GitHub Token</label>
-              <input v-model="githubForm.token" type="password" required placeholder="ghp_..." />
-            </div>
-            <div class="form-group">
-              <label>
-                <input v-model="githubForm.assignedOnly" type="checkbox" />
-                Only show assigned issues/PRs
-              </label>
-            </div>
-            <div class="form-group">
+        <div class="form-group">
+          <label>Name</label>
+          <input v-model="githubForm.name" type="text" required placeholder="e.g., My Project" />
+        </div>
+        <div class="form-group">
+          <label>Owner</label>
+          <input v-model="githubForm.owner" type="text" required placeholder="username or org" />
+        </div>
+        <div class="form-group">
+          <label>Repository</label>
+          <input v-model="githubForm.repo" type="text" required placeholder="repo-name" />
+        </div>
+        <div class="form-group">
+          <label>GitHub Token</label>
+          <input v-model="githubForm.token" type="password" required placeholder="ghp_..." />
+        </div>
+        <div class="form-group">
+          <label>
+            <input v-model="githubForm.assignedOnly" type="checkbox" />
+            Only show assigned issues/PRs
+          </label>
+        </div>
+        <div class="form-group">
               <label>Groups (optional)</label>
               <div class="checkbox-group">
                 <label 
@@ -214,7 +214,7 @@
                   :key="group.id"
                   class="checkbox-option"
                 >
-                  <input 
+            <input 
                     type="checkbox" 
                     :value="group.id"
                     v-model="githubForm.groupIds"
@@ -224,13 +224,13 @@
                 <p v-if="groups.length === 0" class="no-groups-hint">
                   No groups available. Create a group in the Group Management section.
                 </p>
-              </div>
-            </div>
+          </div>
+        </div>
             <div class="form-actions">
               <button type="button" @click="closeAddSourceModal" class="cancel-button">Cancel</button>
-              <button type="submit" class="submit-button">Add GitHub Source</button>
+        <button type="submit" class="submit-button">Add GitHub Source</button>
             </div>
-          </form>
+      </form>
         </div>
       </div>
     </div>
@@ -276,6 +276,37 @@
                 <p v-if="groups.length === 0" class="no-groups-hint">
                   No groups available. Create a group in the Group Management section.
                 </p>
+                </div>
+              <div style="margin-top: 12px;">
+                <label style="font-size: 14px; color: #666; margin-bottom: 4px; display: block;">Create New Groups</label>
+                <input 
+                  v-model="editForm.newGroupsInput" 
+                  type="text" 
+                  placeholder="Type group name and press comma to add"
+                  @keydown="handleNewGroupKeydown('edit', $event)"
+                  @blur="handleNewGroupBlur('edit')"
+                  style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;"
+                />
+                <div v-if="editForm.newGroups.length > 0" style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px;">
+                  <span 
+                    v-for="(groupName, index) in editForm.newGroups"
+                    :key="index" 
+                    style="display: inline-flex; align-items: center; gap: 6px; background: #e3f2fd; color: #1976d2; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;"
+                  >
+                    {{ groupName }}
+                    <button 
+                      type="button"
+                      @click="removeNewGroup('edit', index)"
+                      style="background: none; border: none; color: #1976d2; cursor: pointer; padding: 0; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; font-size: 16px; line-height: 1;"
+                      title="Remove"
+                    >
+                      ×
+                    </button>
+                  </span>
+                </div>
+                <small style="color: #666; font-size: 12px; margin-top: 4px; display: block;">
+                  Type a group name and press comma to add it. Groups will be created when you save.
+                </small>
               </div>
             </div>
             <div class="form-group">
@@ -332,6 +363,37 @@
                 <p v-if="groups.length === 0" class="no-groups-hint">
                   No groups available. Create a group in the Group Management section.
                 </p>
+                </div>
+              <div style="margin-top: 12px;">
+                <label style="font-size: 14px; color: #666; margin-bottom: 4px; display: block;">Create New Groups</label>
+                <input 
+                  v-model="editForm.newGroupsInput" 
+                  type="text" 
+                  placeholder="Type group name and press comma to add"
+                  @keydown="handleNewGroupKeydown('edit', $event)"
+                  @blur="handleNewGroupBlur('edit')"
+                  style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;"
+                />
+                <div v-if="editForm.newGroups.length > 0" style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px;">
+                  <span
+                    v-for="(groupName, index) in editForm.newGroups"
+                    :key="index"
+                    style="display: inline-flex; align-items: center; gap: 6px; background: #e3f2fd; color: #1976d2; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;"
+                  >
+                    {{ groupName }}
+                    <button
+                      type="button"
+                      @click="removeNewGroup('edit', index)"
+                      style="background: none; border: none; color: #1976d2; cursor: pointer; padding: 0; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; font-size: 16px; line-height: 1;"
+                      title="Remove"
+                    >
+                      ×
+                    </button>
+                  </span>
+                </div>
+                <small style="color: #666; font-size: 12px; margin-top: 4px; display: block;">
+                  Type a group name and press comma to add it. Groups will be created when you save.
+                </small>
               </div>
             </div>
             <div class="form-group">
@@ -360,13 +422,45 @@
         <div class="edit-panel-content">
           <form @submit.prevent="saveGroup" class="source-form" novalidate>
             <div class="form-group">
-              <label>Group Name</label>
+              <label>Group Name{{ editingGroup && !editingGroup.id ? 's' : '' }}</label>
               <input 
+                v-if="editingGroup && editingGroup.id"
                 v-model="groupForm.name" 
                 type="text" 
-                required 
+                required
                 placeholder="e.g., Work, Personal, etc." 
               />
+              <div v-else>
+                <input 
+                  v-model="groupForm.newGroupsInput" 
+                  type="text" 
+                  required
+                  placeholder="Type group name and press comma to add"
+                  @keydown="handleNewGroupKeydown('group', $event)"
+                  @blur="handleNewGroupBlur('group')"
+                  style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;"
+                />
+                <div v-if="groupForm.newGroups.length > 0" style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px;">
+                  <span
+                    v-for="(groupName, index) in groupForm.newGroups"
+                    :key="index"
+                    style="display: inline-flex; align-items: center; gap: 6px; background: #e3f2fd; color: #1976d2; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;"
+                  >
+                    {{ groupName }}
+                    <button
+                      type="button"
+                      @click="removeNewGroup('group', index)"
+                      style="background: none; border: none; color: #1976d2; cursor: pointer; padding: 0; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; font-size: 16px; line-height: 1;"
+                      title="Remove"
+                    >
+                      ×
+                    </button>
+                  </span>
+                </div>
+                <small style="color: #666; font-size: 12px; margin-top: 4px; display: block;">
+                  Type a group name and press comma to add it. Groups will be created when you save.
+                </small>
+              </div>
             </div>
             <div v-if="editingGroup && editingGroup.id" class="form-group">
               <label>Sources in this Group</label>
@@ -448,11 +542,15 @@ const editForm = ref({
   token: '',
   assignedOnly: false,
   groupIds: [] as number[],
+  newGroupsInput: '',
+  newGroups: [] as string[], // Chips for new groups to create
   enabled: true,
 });
 
 const groupForm = ref({
   name: '',
+  newGroupsInput: '',
+  newGroups: [] as string[], // Chips for new groups to create
   sourceIds: [] as number[],
 });
 
@@ -495,22 +593,22 @@ const addRssSource = async (e?: Event) => {
   
   addingSource.value = true;
   try {
-    const source: SourceInput = {
-      source_type: 'rss',
-      name: rssForm.value.name,
-      config_json: {
-        url: rssForm.value.url,
-        poll_interval: rssForm.value.pollInterval || '10m',
-      },
+  const source: SourceInput = {
+    source_type: 'rss',
+    name: rssForm.value.name,
+    config_json: {
+      url: rssForm.value.url,
+      poll_interval: rssForm.value.pollInterval || '10m',
+    },
       group_ids: rssForm.value.groupIds.length > 0 ? rssForm.value.groupIds : null,
-    };
+  };
 
-    await addSource(source);
+  await addSource(source);
     await fetchGroups();
     await fetchSources();
     closeAddSourceModal();
-    
-    // Reset form
+  
+  // Reset form
     rssForm.value = { name: '', url: '', pollInterval: '10m', groupIds: [] };
     return false;
   } catch (e) {
@@ -545,24 +643,24 @@ const addGitHubSource = async (e?: Event) => {
   
   addingSource.value = true;
   try {
-    const source: SourceInput = {
-      source_type: 'github',
-      name: githubForm.value.name,
-      config_json: {
-        owner: githubForm.value.owner,
-        repo: githubForm.value.repo,
-        assigned_only: githubForm.value.assignedOnly,
-      },
-      token: githubForm.value.token,
+  const source: SourceInput = {
+    source_type: 'github',
+    name: githubForm.value.name,
+    config_json: {
+      owner: githubForm.value.owner,
+      repo: githubForm.value.repo,
+      assigned_only: githubForm.value.assignedOnly,
+    },
+    token: githubForm.value.token,
       group_ids: githubForm.value.groupIds.length > 0 ? githubForm.value.groupIds : null,
-    };
+  };
 
-    await addSource(source);
+  await addSource(source);
     await fetchGroups();
     await fetchSources();
     closeAddSourceModal();
-    
-    // Reset form
+  
+  // Reset form
     githubForm.value = { name: '', owner: '', repo: '', token: '', assignedOnly: false, groupIds: [] };
     return false;
   } catch (e) {
@@ -594,6 +692,8 @@ const editSource = (source: Source) => {
   editForm.value.name = source.name;
   editForm.value.enabled = source.enabled;
   editForm.value.groupIds = source.group_ids || [];
+  editForm.value.newGroupsInput = '';
+  editForm.value.newGroups = [];
   
   if (source.source_type === 'rss') {
     editForm.value.url = config.url || '';
@@ -617,6 +717,8 @@ const closeEditPanel = () => {
     token: '',
     assignedOnly: false,
     groupIds: [],
+    newGroupsInput: '',
+    newGroups: [],
     enabled: true,
   };
 };
@@ -654,9 +756,30 @@ const saveEdit = async (e?: Event) => {
   savingSource.value = true;
   try {
     // Convert Proxy array to plain array to ensure proper serialization
-    const groupIds = Array.isArray(editForm.value.groupIds) 
+    let groupIds = Array.isArray(editForm.value.groupIds) 
       ? [...editForm.value.groupIds] 
       : [];
+    
+    // Create new groups from chips
+    for (const groupName of editForm.value.newGroups) {
+      // Check if group already exists
+      let existingGroup = groups.value.find(g => g.name.toLowerCase() === groupName.toLowerCase());
+      
+      if (!existingGroup) {
+        // Create new group
+        const newGroupId = await addGroup(groupName);
+        if (newGroupId) {
+          await fetchGroups();
+          existingGroup = groups.value.find(g => g.id === newGroupId);
+          if (existingGroup && !groupIds.includes(existingGroup.id)) {
+            groupIds.push(existingGroup.id);
+          }
+        }
+      } else if (!groupIds.includes(existingGroup.id)) {
+        // Group exists but not selected, add it
+        groupIds.push(existingGroup.id);
+      }
+    }
     
     const update: UpdateSourceInput = {
       name: editForm.value.name,
@@ -686,6 +809,10 @@ const saveEdit = async (e?: Event) => {
     // Refresh data
     await fetchGroups();
     await fetchSources();
+    
+    // Clear new groups input and chips
+    editForm.value.newGroupsInput = '';
+    editForm.value.newGroups = [];
     
     // Close panel only after successful update
     closeEditPanel();
@@ -732,7 +859,7 @@ const handleSyncSource = async (id: number) => {
   syncingSources.value.add(id);
   try {
     await syncSource(id);
-    await fetchSources();
+      await fetchSources();
   } catch (e) {
     const errorMsg = e instanceof Error ? e.message : String(e);
     console.error('Failed to sync source:', e);
@@ -786,18 +913,27 @@ const saveGroup = async (e?: Event) => {
   if (savingGroup.value) return false;
   if (!editingGroup.value) return false;
   
-  if (!groupForm.value.name.trim()) {
-    alert('Please enter a group name');
-    return false;
+  if (editingGroup.value.id) {
+    // Editing existing group - validate name
+    if (!groupForm.value.name.trim()) {
+      alert('Please enter a group name');
+      return false;
+    }
+  } else {
+    // Creating new groups - validate chips
+    if (groupForm.value.newGroups.length === 0) {
+      alert('Please enter at least one group name');
+      return false;
+    }
   }
   
   savingGroup.value = true;
   try {
-    let groupId: number;
     if (editingGroup.value.id) {
+      // Editing existing group - single name only
+      const groupId = editingGroup.value.id;
       // Update existing group
       await updateGroup(editingGroup.value.id, groupForm.value.name);
-      groupId = editingGroup.value.id;
       
       // Update source-group relationships
       for (const source of sources.value) {
@@ -813,16 +949,44 @@ const saveGroup = async (e?: Event) => {
         }
       }
     } else {
-      // Create new group
-      groupId = await addGroup(groupForm.value.name);
+      // Creating new group(s) - use chips array
+      if (groupForm.value.newGroups.length === 0) {
+        throw new Error('Please enter at least one group name');
+      }
       
-      // Assign sources to the new group
-      if (groupForm.value.sourceIds.length > 0) {
+      const createdGroupIds: number[] = [];
+      
+      // Create all groups from chips
+      for (const groupName of groupForm.value.newGroups) {
+        // Check if group already exists
+        let existingGroup = groups.value.find(g => g.name.toLowerCase() === groupName.toLowerCase());
+        
+        if (!existingGroup) {
+          // Create new group
+          const newGroupId = await addGroup(groupName);
+          if (newGroupId) {
+            await fetchGroups();
+            existingGroup = groups.value.find(g => g.id === newGroupId);
+            if (existingGroup) {
+              createdGroupIds.push(existingGroup.id);
+            }
+          }
+        } else {
+          // Group already exists, use it
+          if (!createdGroupIds.includes(existingGroup.id)) {
+            createdGroupIds.push(existingGroup.id);
+          }
+        }
+      }
+      
+      // Assign sources to all created groups
+      if (groupForm.value.sourceIds.length > 0 && createdGroupIds.length > 0) {
         await fetchGroups();
         for (const sourceId of groupForm.value.sourceIds) {
           const source = sources.value.find(s => s.id === sourceId);
           if (source) {
-            const newGroupIds = [...(source.group_ids || []), groupId];
+            const existingGroupIds = source.group_ids || [];
+            const newGroupIds = [...new Set([...existingGroupIds, ...createdGroupIds])];
             await updateSource(sourceId, { group_ids: newGroupIds });
           }
         }
@@ -870,6 +1034,39 @@ const removeGroup = async (id: number) => {
   }
 };
 
+
+// Handle new group input keydown (comma or Enter to add chip)
+const handleNewGroupKeydown = (formType: 'edit' | 'group', event: KeyboardEvent) => {
+  if (event.key === ',' || event.key === 'Enter') {
+    event.preventDefault();
+    event.stopPropagation();
+    addNewGroupChip(formType);
+  }
+};
+
+// Handle new group input blur (add chip if there's text)
+const handleNewGroupBlur = (formType: 'edit' | 'group') => {
+  const form = formType === 'edit' ? editForm.value : groupForm.value;
+  if (form.newGroupsInput.trim()) {
+    addNewGroupChip(formType);
+  }
+};
+
+// Add a new group chip from input
+const addNewGroupChip = (formType: 'edit' | 'group') => {
+  const form = formType === 'edit' ? editForm.value : groupForm.value;
+  const trimmed = form.newGroupsInput.trim();
+  if (trimmed && !form.newGroups.includes(trimmed)) {
+    form.newGroups.push(trimmed);
+    form.newGroupsInput = '';
+  }
+};
+
+// Remove a new group chip
+const removeNewGroup = (formType: 'edit' | 'group', index: number) => {
+  const form = formType === 'edit' ? editForm.value : groupForm.value;
+  form.newGroups.splice(index, 1);
+};
 
 const formatDate = (timestamp: number) => {
   const date = new Date(timestamp * 1000);
