@@ -116,6 +116,9 @@ impl IngestSource for GitHubIngester {
                     occurred_at,
                     image_url: None,
                     content_html: None,
+                    author: None,
+                    category: None,
+                    comments: None,
                 }
             })
             .collect();

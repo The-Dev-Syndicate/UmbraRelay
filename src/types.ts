@@ -11,6 +11,9 @@ export interface Item {
   updated_at: number;
   image_url?: string | null;
   content_html?: string | null;
+  author?: string | null;
+  category?: string | null; // JSON array string
+  comments?: string | null;
   source_name?: string | null;
   source_group?: string | null;
 }

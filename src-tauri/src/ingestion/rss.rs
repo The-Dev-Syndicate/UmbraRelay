@@ -238,6 +238,21 @@ impl IngestSource for RssIngester {
                     (None, None)
                 };
                 
+                // Extract RSS 2.0 optional fields
+                let author = item.author().map(|s| s.to_string());
+                let category: Option<Vec<String>> = {
+                    let categories: Vec<String> = item.categories()
+                        .iter()
+                        .map(|c| c.name().to_string())
+                        .collect();
+                    if categories.is_empty() {
+                        None
+                    } else {
+                        Some(categories)
+                    }
+                };
+                let comments = item.comments().map(|s| s.to_string());
+                
                 IngestedItem {
                     external_id,
                     title,
@@ -247,6 +262,9 @@ impl IngestSource for RssIngester {
                     occurred_at,
                     image_url,
                     content_html,
+                    author,
+                    category,
+                    comments,
                 }
             })
             .collect();

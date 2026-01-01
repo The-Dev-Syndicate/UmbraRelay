@@ -11,6 +11,9 @@ pub struct IngestedItem {
     pub occurred_at: Option<i64>,
     pub image_url: Option<String>,
     pub content_html: Option<String>,
+    pub author: Option<String>,
+    pub category: Option<Vec<String>>,
+    pub comments: Option<String>,
 }
 
 pub trait IngestSource: Send + Sync {

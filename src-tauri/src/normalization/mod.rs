@@ -10,6 +10,11 @@ pub fn normalize_and_dedupe(
     let mut item_ids = Vec::new();
     
     for item in items {
+        // Convert category Vec<String> to JSON string
+        let category_json = item.category.as_ref().map(|cats| {
+            serde_json::to_string(cats).unwrap_or_default()
+        });
+        
         let item_id = db.upsert_item(
             source_id,
             &item.external_id,
@@ -19,6 +24,9 @@ pub fn normalize_and_dedupe(
             &item.item_type,
             item.image_url.as_deref(),
             item.content_html.as_deref(),
+            item.author.as_deref(),
+            category_json.as_deref(),
+            item.comments.as_deref(),
         )?;
         
         item_ids.push(item_id);

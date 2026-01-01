@@ -32,6 +32,12 @@ pub struct Item {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content_html: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub author: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>, // JSON array string
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comments: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub source_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_group: Option<String>,
@@ -68,6 +74,9 @@ impl Item {
             updated_at: row.get(9)?,
             image_url: row.get(10).ok(),
             content_html: row.get(11).ok(),
+            author: row.get(12).ok(),
+            category: row.get(13).ok(),
+            comments: row.get(14).ok(),
             source_name: None,
             source_group: None,
         })
@@ -87,8 +96,11 @@ impl Item {
             updated_at: row.get(9)?,
             image_url: row.get(10).ok(),
             content_html: row.get(11).ok(),
-            source_name: row.get(12).ok(),
-            source_group: row.get(13).ok(),
+            author: row.get(12).ok(),
+            category: row.get(13).ok(),
+            comments: row.get(14).ok(),
+            source_name: row.get(15).ok(),
+            source_group: row.get(16).ok(),
         })
     }
 }

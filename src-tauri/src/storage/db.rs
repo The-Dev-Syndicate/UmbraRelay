@@ -89,6 +89,13 @@ impl Database {
                 CREATE INDEX IF NOT EXISTS idx_custom_views_name ON custom_views(name);
                 "#
             ),
+            M::up(
+                r#"
+                ALTER TABLE items ADD COLUMN author TEXT;
+                ALTER TABLE items ADD COLUMN category TEXT;
+                ALTER TABLE items ADD COLUMN comments TEXT;
+                "#
+            ),
         ]);
 
         migrations.to_latest(&mut conn)
@@ -207,6 +214,9 @@ impl Database {
         item_type: &str,
         image_url: Option<&str>,
         content_html: Option<&str>,
+        author: Option<&str>,
+        category: Option<&str>,
+        comments: Option<&str>,
     ) -> Result<i64> {
         let conn = self.conn.lock().unwrap();
         let now = Utc::now().timestamp();
@@ -222,16 +232,16 @@ impl Database {
             Ok(id) => {
                 // Update existing item
                 conn.execute(
-                    "UPDATE items SET title = ?1, summary = ?2, url = ?3, item_type = ?4, image_url = ?5, content_html = ?6, updated_at = ?7 WHERE id = ?8",
-                    params![title, summary, url, item_type, image_url, content_html, now, id],
+                    "UPDATE items SET title = ?1, summary = ?2, url = ?3, item_type = ?4, image_url = ?5, content_html = ?6, author = ?7, category = ?8, comments = ?9, updated_at = ?10 WHERE id = ?11",
+                    params![title, summary, url, item_type, image_url, content_html, author, category, comments, now, id],
                 )?;
                 Ok(id)
             }
             Err(_) => {
                 // Insert new item
                 conn.execute(
-                    "INSERT INTO items (source_id, external_id, title, summary, url, item_type, image_url, content_html, state, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'unread', ?9, ?9)",
-                    params![source_id, external_id, title, summary, url, item_type, image_url, content_html, now],
+                    "INSERT INTO items (source_id, external_id, title, summary, url, item_type, image_url, content_html, author, category, comments, state, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'unread', ?12, ?12)",
+                    params![source_id, external_id, title, summary, url, item_type, image_url, content_html, author, category, comments, now],
                 )?;
                 Ok(conn.last_insert_rowid())
             }
@@ -242,7 +252,7 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         
         // Always JOIN with sources to get source info
-        let mut query = "SELECT i.id, i.source_id, i.external_id, i.title, i.summary, i.url, i.item_type, i.state, i.created_at, i.updated_at, i.image_url, i.content_html, s.name as source_name, s.\"group\" as source_group FROM items i INNER JOIN sources s ON i.source_id = s.id".to_string();
+        let mut query = "SELECT i.id, i.source_id, i.external_id, i.title, i.summary, i.url, i.item_type, i.state, i.created_at, i.updated_at, i.image_url, i.content_html, i.author, i.category, i.comments, s.name as source_name, s.\"group\" as source_group FROM items i INNER JOIN sources s ON i.source_id = s.id".to_string();
         let mut conditions: Vec<String> = Vec::new();
         
         // Build params in order - need to store owned values for string parameters
@@ -347,7 +357,7 @@ impl Database {
     pub fn get_item(&self, id: i64) -> Result<Item> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, source_id, external_id, title, summary, url, item_type, state, created_at, updated_at, image_url, content_html FROM items WHERE id = ?1"
+            "SELECT id, source_id, external_id, title, summary, url, item_type, state, created_at, updated_at, image_url, content_html, author, category, comments FROM items WHERE id = ?1"
         )?;
         stmt.query_row(params![id], |row| Item::from_row(row))
     }

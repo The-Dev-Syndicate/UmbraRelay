@@ -48,6 +48,33 @@
 
       <h1 class="item-title">{{ item.title }}</h1>
 
+      <!-- RSS 2.0 metadata: author, categories, comments -->
+      <div v-if="item.author || categories.length > 0 || item.comments" class="item-metadata">
+        <div v-if="item.author" class="item-author">
+          <span class="metadata-label">Author:</span>
+          <span class="metadata-value">{{ item.author }}</span>
+        </div>
+        <div v-if="categories.length > 0" class="item-categories">
+          <div class="category-tags-container" :class="{ 'expanded': categoriesExpanded }">
+            <span v-for="cat in categories" :key="cat" class="category-tag">{{ cat }}</span>
+          </div>
+          <button 
+            v-if="hasCategoryOverflow" 
+            @click="categoriesExpanded = !categoriesExpanded" 
+            class="category-expand-button"
+            :aria-label="categoriesExpanded ? 'Collapse categories' : 'Expand categories'"
+          >
+            <span v-if="!categoriesExpanded">▼</span>
+            <span v-else>▲</span>
+          </button>
+        </div>
+        <div v-if="item.comments" class="item-comments">
+          <button @click="openComments" class="comments-button">
+            View Comments
+          </button>
+        </div>
+      </div>
+
       <div v-if="item.image_url" class="item-image-container">
         <img :src="item.image_url" :alt="item.title" class="item-image" />
       </div>
@@ -88,11 +115,11 @@
         </div>
       </template>
 
-      <div class="item-url">
+      <!-- <div class="item-url">
         <a :href="item.url" target="_blank" rel="noopener noreferrer">
           {{ item.url }}
         </a>
-      </div>
+      </div> -->
     </div>
   </div>
 </template>
@@ -114,6 +141,7 @@ const props = defineProps<{
 const item = ref<Item | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
+const categoriesExpanded = ref(false);
 
 const fetchItem = async () => {
   loading.value = true;
@@ -193,6 +221,7 @@ const hasContentHtml = computed(() => {
 // Decode HTML entities (fixes double-encoding issue)
 // The RSS feed may have HTML entities like &lt; &gt; &quot; etc. that need to be decoded
 // We decode entities but preserve the HTML structure
+// Also filter out duplicate "Comments" links if we have a comments URL
 const decodedContentHtml = computed(() => {
   if (!item.value?.content_html) return '';
   
@@ -200,9 +229,45 @@ const decodedContentHtml = computed(() => {
   // This is the standard way to decode HTML entities in the browser
   const textarea = document.createElement('textarea');
   textarea.innerHTML = item.value.content_html;
-  return textarea.value;
+  let decoded = textarea.value;
+  
+  // If we have a comments URL, remove "Comments" links from the content to avoid duplicates
+  if (item.value.comments) {
+    // Remove links that contain "comment" in the text (case insensitive)
+    decoded = decoded.replace(/<a[^>]*>.*?[Cc]omment[s]?.*?<\/a>/gi, '');
+    // Also remove standalone "Comments" text that might be leftover
+    decoded = decoded.replace(/\b[Cc]omment[s]?\b(?=\s|$|\.|,)/g, '');
+  }
+  
+  return decoded;
 });
 
+// Parse category JSON array string
+const categories = computed(() => {
+  if (!item.value?.category) return [];
+  try {
+    const parsed = JSON.parse(item.value.category);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+});
+
+// Check if categories overflow (more than 3 tags typically fit in one line)
+const hasCategoryOverflow = computed(() => {
+  return categories.value.length > 3;
+});
+
+const openComments = async () => {
+  if (!item.value?.comments) return;
+  
+  try {
+    await openUrl(item.value.comments);
+  } catch (e) {
+    error.value = e as string;
+    console.error('Failed to open comments URL:', e);
+  }
+};
 
 onMounted(() => {
   fetchItem();
@@ -320,6 +385,99 @@ onMounted(() => {
   font-size: 28px;
   font-weight: 600;
   line-height: 1.3;
+}
+
+.item-metadata {
+  margin-bottom: 20px;
+  padding: 12px 0;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.item-author {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.item-categories {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.metadata-label {
+  font-weight: 500;
+  color: #666;
+}
+
+.metadata-value {
+  color: #1a1a1a;
+}
+
+.category-tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 500px;
+  overflow: hidden;
+  max-height: 32px; /* Approximately one line of tags */
+  transition: max-height 0.3s ease;
+}
+
+.category-tags-container.expanded {
+  max-height: none;
+}
+
+.category-tag {
+  display: inline-block;
+  padding: 4px 10px;
+  background: #e3f2fd;
+  color: #1976d2;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.category-expand-button {
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+  margin-top: 2px;
+  transition: color 0.2s ease;
+}
+
+.category-expand-button:hover {
+  color: #396cd8;
+}
+
+.item-comments {
+  margin-top: 4px;
+}
+
+.comments-button {
+  padding: 6px 14px;
+  background: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #396cd8;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.comments-button:hover {
+  background: #e8f0fe;
+  border-color: #396cd8;
 }
 
 .item-summary {
