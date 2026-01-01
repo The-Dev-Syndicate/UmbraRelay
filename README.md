@@ -57,7 +57,7 @@ For development setup and contribution guidelines, see the [Development Guide](d
 
 ## License
 
-[Add your license here]
+Pending - All rights reserved I guess for now.
 
 ## Contributing
 
