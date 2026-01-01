@@ -181,7 +181,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import InboxView from './components/InboxView.vue';
 import TodayView from './components/TodayView.vue';
 import LeavingSoonView from './components/LeavingSoonView.vue';
@@ -206,6 +206,10 @@ const myViewsExpanded = ref(false);
 const showViewConfig = ref(false);
 const editingViewId = ref<number | null>(null);
 const searchQuery = ref('');
+
+// Store previous expand states to restore when search is cleared
+const previousSourcesExpanded = ref(false);
+const previousMyViewsExpanded = ref(false);
 
 const { customViews, fetchCustomViews, deleteCustomView } = useCustomViews();
 const { sources, fetchSources } = useSources();
@@ -285,6 +289,38 @@ const deleteView = async (id: number) => {
     }
   }
 };
+
+// Watch search query to expand/collapse sections
+watch(searchQuery, (newQuery, oldQuery) => {
+  const hasSearch = newQuery.trim().length > 0;
+  const hadSearch = oldQuery && oldQuery.trim().length > 0;
+  
+  if (hasSearch && !hadSearch) {
+    // Search just started - save current state and expand sections
+    previousSourcesExpanded.value = sourcesExpanded.value;
+    previousMyViewsExpanded.value = myViewsExpanded.value;
+    
+    // Expand sections if they have matching results
+    if (filteredSources.value.length > 0) {
+      sourcesExpanded.value = true;
+    }
+    if (filteredViews.value.length > 0) {
+      myViewsExpanded.value = true;
+    }
+  } else if (!hasSearch && hadSearch) {
+    // Search was cleared - restore previous state
+    sourcesExpanded.value = previousSourcesExpanded.value;
+    myViewsExpanded.value = previousMyViewsExpanded.value;
+  } else if (hasSearch) {
+    // Search query changed - keep sections expanded if they have results
+    if (filteredSources.value.length > 0) {
+      sourcesExpanded.value = true;
+    }
+    if (filteredViews.value.length > 0) {
+      myViewsExpanded.value = true;
+    }
+  }
+});
 
 onMounted(() => {
   console.log('UmbraRelay app mounted');
