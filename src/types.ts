@@ -5,7 +5,7 @@ export interface Item {
   title: string;
   summary: string | null;
   url: string;
-  item_type: 'post' | 'issue' | 'pr';
+  item_type: 'rss' | 'atom' | 'issue' | 'pr';
   state: 'unread' | 'read' | 'archived';
   created_at: number;
   updated_at: number;
@@ -42,7 +42,7 @@ export interface Group {
 
 export interface Source {
   id: number;
-  source_type: 'rss' | 'github';
+  source_type: 'rss' | 'atom' | 'github';
   name: string;
   config_json: Record<string, any> | string; // Can be string from backend or parsed object
   enabled: boolean;

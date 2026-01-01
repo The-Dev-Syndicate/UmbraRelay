@@ -258,7 +258,7 @@ impl IngestSource for RssIngester {
                     title,
                     summary,
                     url,
-                    item_type: "post".to_string(),
+                    item_type: "rss".to_string(),
                     occurred_at,
                     image_url,
                     content_html,
