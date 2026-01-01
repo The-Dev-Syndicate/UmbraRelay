@@ -3,208 +3,89 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
   workflow_dispatch:
 
-jobs:
-  create-release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    outputs:
-      release_id: ${{ steps.create_release.outputs.id }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Fetch all history and tags
-      - name: setup node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - name: get version
-        run: echo "PACKAGE_VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_ENV
-      - name: check for changelog
-        id: changelog
-        run: |
-          if [ -f CHANGELOG.md ]; then
-            VERSION="${{ github.ref_name }}"
-            # Check if this version exists in CHANGELOG.md
-            if grep -qE "^## \[?$VERSION\]?" CHANGELOG.md || grep -qE "^## $VERSION" CHANGELOG.md; then
-              echo "has_changelog=true" >> $GITHUB_OUTPUT
-              # Extract changelog section for this version
-              # Match from ## [v0.0.1] or ## v0.0.1 until next ## or end of file
-              awk "/^## \[?$VERSION\]?/,/^## / {if (NR > 1 && /^## /) exit; print}" CHANGELOG.md > changelog_section.md || \
-              awk "/^## \[?$VERSION\]?/,EOF {print}" CHANGELOG.md > changelog_section.md
-            else
-              echo "has_changelog=false" >> $GITHUB_OUTPUT
-            fi
-          else
-            echo "has_changelog=false" >> $GITHUB_OUTPUT
-          fi
-      - name: verify tag exists
-        run: |
-          TAG_NAME="${{ github.ref_name }}"
-          echo "Verifying tag exists: $TAG_NAME"
-          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-            echo "✓ Tag exists locally"
-            git show "$TAG_NAME" --no-patch --format="Tag: %D%nCommit: %H%nAuthor: %an <%ae>%nDate: %ad" || true
-          else
-            echo "⚠️  Tag not found locally, fetching..."
-            git fetch origin tag "$TAG_NAME" || true
-          fi
-      - name: create release and get ID
-        id: create_release
-        run: |
-          TAG_NAME="${{ github.ref_name }}"
-          RELEASE_NAME="UmbraRelay ${{ github.ref_name }}"
-          
-          # Check if release already exists first
-          echo "Checking if release already exists for tag: $TAG_NAME"
-          EXISTING_ID=$(gh api repos/${{ github.repository }}/releases/tags/$TAG_NAME --jq .id 2>/dev/null || echo "")
-          if [ -n "$EXISTING_ID" ] && [ "$EXISTING_ID" != "null" ] && [ "$EXISTING_ID" != "" ]; then
-            echo "✓ Release already exists with ID: $EXISTING_ID"
-            echo "id=$EXISTING_ID" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          
-          # Prepare release notes
-          if [ "${{ steps.changelog.outputs.has_changelog }}" = "true" ] && [ -f changelog_section.md ]; then
-            echo "Using changelog content for release notes"
-            NOTES_FILE="changelog_section.md"
-            USE_NOTES=true
-          else
-            echo "Will use auto-generated release notes"
-            USE_NOTES=false
-          fi
-          
-          # Create release and get ID immediately
-          echo "Creating release: $RELEASE_NAME for tag: $TAG_NAME"
-          echo "Repository: ${{ github.repository }}"
-          
-          # Run the command and capture both stdout and stderr
-          if [ "$USE_NOTES" = "true" ]; then
-            echo "Running: gh release create with notes file"
-            if ! RESPONSE=$(gh release create "$TAG_NAME" \
-              --title "$RELEASE_NAME" \
-              --notes-file "$NOTES_FILE" \
-              --draft \
-              --repo ${{ github.repository }} \
-              --json id,url,tag_name 2>&1); then
-              EXIT_CODE=$?
-              echo "❌ Command failed with exit code: $EXIT_CODE"
-              echo "Error output:"
-              echo "$RESPONSE"
-              exit 1
-            fi
-          else
-            echo "Running: gh release create with --generate-notes"
-            if ! RESPONSE=$(gh release create "$TAG_NAME" \
-              --title "$RELEASE_NAME" \
-              --generate-notes \
-              --draft \
-              --repo ${{ github.repository }} \
-              --json id,url,tag_name 2>&1); then
-              EXIT_CODE=$?
-              echo "❌ Command failed with exit code: $EXIT_CODE"
-              echo "Error output:"
-              echo "$RESPONSE"
-              exit 1
-            fi
-          fi
-          
-          EXIT_CODE=0
-          echo "Command succeeded!"
-          echo "Response: $RESPONSE"
-          
-          RELEASE_ID=$(echo "$RESPONSE" | jq -r '.id // empty' 2>/dev/null || echo "")
-          if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "null" ] && [ "$RELEASE_ID" != "" ]; then
-            echo "id=$RELEASE_ID" >> $GITHUB_OUTPUT
-            echo "✓ Release created successfully!"
-            echo "Release ID: $RELEASE_ID"
-          else
-            echo "⚠️  Could not extract ID from JSON, trying API lookup..."
-            sleep 2
-            FALLBACK_ID=$(gh api repos/${{ github.repository }}/releases/tags/$TAG_NAME --jq .id 2>/dev/null || echo "")
-            if [ -n "$FALLBACK_ID" ] && [ "$FALLBACK_ID" != "null" ] && [ "$FALLBACK_ID" != "" ]; then
-              echo "id=$FALLBACK_ID" >> $GITHUB_OUTPUT
-              echo "✓ Got release ID via API: $FALLBACK_ID"
-            else
-              echo "❌ Could not get release ID from response or API"
-              echo "Response was: $RESPONSE"
-              exit 1
-            fi
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+permissions:
+  contents: write
 
+jobs:
   build-tauri:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: create-release
-    permissions:
-      contents: write
+    name: Build Tauri (${{ matrix.platform }})
+    runs-on: ${{ matrix.platform }}
+
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest'
-            args: ''
-          - platform: 'windows-latest'
-            args: ''
-          - platform: 'ubuntu-latest'
-            args: ''
-    runs-on: ${{ matrix.platform }}
+          - platform: macos-latest
+            rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
+          - platform: windows-latest
+            rust-targets: x86_64-pc-windows-msvc
+          - platform: ubuntu-latest
+            rust-targets: x86_64-unknown-linux-gnu
+
     steps:
+      # ─────────────────────────────────────────────────────────────
+      # Checkout
+      # ─────────────────────────────────────────────────────────────
       - uses: actions/checkout@v4
-      
-      - name: setup node
+
+      # ─────────────────────────────────────────────────────────────
+      # Node.js
+      # ─────────────────────────────────────────────────────────────
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      
-      - name: install Rust stable
+          cache: "npm"
+
+      # ─────────────────────────────────────────────────────────────
+      # Rust
+      # ─────────────────────────────────────────────────────────────
+      - name: Install Rust (stable)
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || matrix.platform == 'windows-latest' && 'x86_64-pc-windows-msvc' || 'x86_64-unknown-linux-gnu' }}
-      
-      - name: install dependencies (ubuntu only)
+          targets: ${{ matrix.rust-targets }}
+
+      # Cache Cargo builds
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      # ─────────────────────────────────────────────────────────────
+      # Linux dependencies
+      # ─────────────────────────────────────────────────────────────
+      - name: Install Linux system dependencies
         if: matrix.platform == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
-      
-      - name: install frontend dependencies
-        run: npm install
-      
-      - name: check release id
-        id: check_release
-        run: |
-          RELEASE_ID="${{ needs.create-release.outputs.release_id }}"
-          if [ -z "$RELEASE_ID" ] || [ "$RELEASE_ID" = "0" ]; then
-            echo "⚠️  Warning: Release ID not found, attempting to find release by tag..."
-            # Try to find the release by tag
-            FOUND_ID=$(gh api repos/${{ github.repository }}/releases/tags/${{ github.ref_name }} --jq .id 2>/dev/null || echo "")
-            if [ -n "$FOUND_ID" ] && [ "$FOUND_ID" != "null" ]; then
-              echo "✓ Found release ID: $FOUND_ID"
-              echo "release_id=$FOUND_ID" >> $GITHUB_OUTPUT
-            else
-              echo "❌ Could not find release. Build may fail to upload artifacts."
-              echo "release_id=" >> $GITHUB_OUTPUT
-            fi
-          else
-            echo "✓ Using release ID: $RELEASE_ID"
-            echo "release_id=$RELEASE_ID" >> $GITHUB_OUTPUT
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
-      - name: build and upload
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      # ─────────────────────────────────────────────────────────────
+      # Frontend deps
+      # ─────────────────────────────────────────────────────────────
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # ─────────────────────────────────────────────────────────────
+      # Build & Release
+      # ─────────────────────────────────────────────────────────────
+      - name: Build and upload Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          projectPath: ./
           tagName: ${{ github.ref_name }}
-          releaseId: ${{ steps.check_release.outputs.release_id }}
-          args: ${{ matrix.args }}
-
+          releaseName: "UmbraRelay ${{ github.ref_name }}"
+          releaseDraft: true
+          releaseGenerateNotes: true
