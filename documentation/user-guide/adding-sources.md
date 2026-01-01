@@ -15,10 +15,6 @@ Learn how to add and configure RSS feeds and GitHub sources.
      - Format: `5m`, `10m`, `1h`, etc.
 4. Click **Add RSS Feed**
 
-### Adding via TOML Config
-
-See [Configuration Guide](configuration.md) for TOML syntax.
-
 ### Finding RSS Feeds
 
 Many websites provide RSS feeds. Look for:
@@ -81,8 +77,8 @@ You need a GitHub Personal Access Token:
 
 ### Editing Sources
 
-- Click **Edit** button (coming soon - currently requires TOML editing)
-- Or edit the TOML config file directly
+- Click **Edit** button to modify source settings
+- Update name, URL, poll interval, or other settings as needed
 
 ### Removing Sources
 

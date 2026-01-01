@@ -6,7 +6,7 @@ Comprehensive guide to using UmbraRelay's features.
 
 1. [Inbox Management](inbox-management.md) - Managing your inbox items
 2. [Adding Sources](adding-sources.md) - Adding and configuring RSS and GitHub sources
-3. [Configuration](configuration.md) - Configuring UmbraRelay via TOML or UI
+3. [Configuration](configuration.md) - Configuring UmbraRelay settings
 4. [Troubleshooting](troubleshooting.md) - Common issues and solutions
 
 ## Quick Reference
@@ -21,6 +21,6 @@ Comprehensive guide to using UmbraRelay's features.
 ## Need Help?
 
 - Check [Troubleshooting](troubleshooting.md) for common issues
-- See [Examples](../examples/config-examples.md) for configuration examples
+- See [Use Cases](../examples/use-cases.md) for usage examples
 - Review [Technical Docs](../technical/README.md) for advanced topics
 

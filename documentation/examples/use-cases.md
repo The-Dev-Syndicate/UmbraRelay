@@ -7,20 +7,9 @@ Real-world usage scenarios for UmbraRelay.
 **Scenario**: Track GitHub issues and PRs assigned to you across multiple projects.
 
 **Setup**:
-```toml
-[github]
-poll_interval = "5m"
-
-[[github.repos]]
-owner = "my-org"
-repo = "main-project"
-assigned_only = true
-
-[[github.repos]]
-owner = "my-org"
-repo = "side-project"
-assigned_only = true
-```
+1. Add GitHub source for "my-org/main-project" with `assigned_only` enabled
+2. Add GitHub source for "my-org/side-project" with `assigned_only` enabled
+3. Set poll interval to 5 minutes for both sources
 
 **Workflow**:
 1. UmbraRelay polls GitHub every 5 minutes
@@ -40,22 +29,9 @@ assigned_only = true
 **Scenario**: Aggregate news from multiple RSS feeds.
 
 **Setup**:
-```toml
-[[rss]]
-name = "Hacker News"
-url = "https://news.ycombinator.com/rss"
-poll_interval = "15m"
-
-[[rss]]
-name = "Lobsters"
-url = "https://lobste.rs/rss"
-poll_interval = "15m"
-
-[[rss]]
-name = "TechCrunch"
-url = "https://techcrunch.com/feed/"
-poll_interval = "30m"
-```
+1. Add RSS feed: "Hacker News" at `https://news.ycombinator.com/rss` (15m interval)
+2. Add RSS feed: "Lobsters" at `https://lobste.rs/rss` (15m interval)
+3. Add RSS feed: "TechCrunch" at `https://techcrunch.com/feed/` (30m interval)
 
 **Workflow**:
 1. UmbraRelay polls feeds at configured intervals
@@ -75,20 +51,8 @@ poll_interval = "30m"
 **Scenario**: Combine GitHub notifications with tech news.
 
 **Setup**:
-```toml
-[github]
-poll_interval = "5m"
-
-[[github.repos]]
-owner = "my-org"
-repo = "project"
-assigned_only = true
-
-[[rss]]
-name = "Dev.to"
-url = "https://dev.to/feed"
-poll_interval = "30m"
-```
+1. Add GitHub source for "my-org/project" with `assigned_only` enabled (5m interval)
+2. Add RSS feed: "Dev.to" at `https://dev.to/feed` (30m interval)
 
 **Workflow**:
 1. Check inbox for GitHub issues/PRs

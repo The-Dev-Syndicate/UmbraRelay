@@ -47,23 +47,18 @@ Common issues and solutions for UmbraRelay.
 4. **Backup**: Backup database before troubleshooting
 
 **Database Location**:
-- Same directory as config file
+- App data directory (platform-specific)
 - File: `umbrarelay.db`
 
-## Config File Errors
+## Configuration Issues
 
-**Problem**: Config file not loading or errors
+**Problem**: Sources not saving or configuration errors
 
 **Solutions**:
-1. **Syntax Check**: Verify TOML syntax is correct
-2. **File Location**: Check config file is in correct location
-3. **Permissions**: Ensure file is readable
-4. **Example Config**: Compare with example config file
-
-**Common Syntax Errors**:
-- Missing quotes around strings
-- Invalid poll interval format
-- Missing brackets for arrays
+1. **Check Database**: Ensure database is accessible and writable
+2. **Permissions**: Ensure app has write permissions to data directory
+3. **Restart App**: Try restarting the app if changes aren't saving
+4. **Re-add Source**: If a source isn't working, try removing and re-adding it
 
 ## GitHub Authentication Problems
 
@@ -126,7 +121,7 @@ If you encounter a bug:
 ## Getting Help
 
 - **Documentation**: Check other documentation sections
-- **Examples**: See [Config Examples](../examples/config-examples.md)
+- **Examples**: See [Use Cases](../examples/use-cases.md)
 - **GitHub Issues**: Search existing issues or open a new one
 - **Development Guide**: See [Development](../technical/development.md) for advanced troubleshooting
 

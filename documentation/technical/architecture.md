@@ -24,7 +24,7 @@ UmbraRelay is a desktop application built with:
 │                  Rust Backend (Tauri)                    │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
 │  │   Config     │  │  Ingestion   │  │   Storage    │  │
-│  │  (TOML + UI) │  │  (RSS/GitHub)│  │   (SQLite)   │  │
+│  │   (Config)   │  │  (RSS/GitHub)│  │   (SQLite)   │  │
 │  └──────────────┘  └──────────────┘  └──────────────┘  │
 │  ┌──────────────────────────────────────────────────┐  │
 │  │         Background Polling Service                │  │
@@ -43,7 +43,7 @@ UmbraRelay is a desktop application built with:
 ### Backend Modules
 
 - **storage/**: Database operations and models
-- **config/**: TOML parsing and secure token storage
+- **config/**: Secure token storage
 - **ingestion/**: RSS and GitHub API integration
 - **normalization/**: Deduplication and upsert logic
 - **commands/**: Tauri command handlers
@@ -107,10 +107,10 @@ The background polling service:
 
 ## Configuration
 
-- **Format**: TOML
-- **Location**: App data directory
-- **Name**: `umbrarelay.toml`
-- **Reload**: Requires app restart (hot-reload coming)
+- **Method**: UI-based configuration
+- **Storage**: SQLite database (app data directory)
+- **Changes**: Take effect immediately
+- **Tokens**: Stored securely using Tauri's secure storage
 
 ## Error Handling
 

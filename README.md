@@ -2,80 +2,49 @@
 
 A local-first desktop inbox aggregator that runs entirely on your machine.
 
+![UmbraRelay Application Screenshot](public/UmbraRelay.png)
+
+*Screenshot placeholder - replace with actual application screenshot*
+
 ## Overview
 
-UmbraRelay aggregates RSS feeds and GitHub issues/PRs into a unified inbox. All data lives on your machine - no external databases, no cloud services, no tracking.
+UmbraRelay aggregates RSS feeds and GitHub issues/PRs into a unified inbox. All data lives on your machine—no external databases, no cloud services, no tracking.
 
 **Umbra** = shadow/quiet (your data stays private)  
 **Relay** = passing signals forward (aggregating information)
 
-## Features
+## Key Features
 
-- **RSS Feeds**: Aggregate multiple RSS feeds
-- **GitHub Integration**: Track issues and PRs assigned to you
-- **Unified Inbox**: Single interface for all sources
-- **Local-First**: All data stored locally in SQLite
-- **Configurable**: TOML config file or UI
-- **Automatic Polling**: Background sync at configurable intervals
+- **Unified Inbox**: Single interface for RSS feeds and GitHub issues/PRs
+- **Local-First**: All data stored locally in SQLite—your data never leaves your machine
+- **Privacy-Focused**: No cloud services, no tracking, no external dependencies
+- **Intuitive UI**: Easy-to-use interface for managing sources and settings
+- **Automatic Sync**: Background polling keeps your inbox up to date
+- **Custom Views**: Organize and filter items to match your workflow
 
 ## Quick Start
 
-### Installation
+Get started with UmbraRelay in minutes:
 
-See [Installation Guide](documentation/getting-started/installation.md) for detailed instructions.
+1. **Install** - See the [Installation Guide](documentation/getting-started/installation.md)
+2. **Configure** - Add your RSS feeds and GitHub repositories
+3. **Sync** - Let UmbraRelay aggregate your sources
+4. **Browse** - View everything in your unified inbox
 
-**Development**:
-```bash
-npm install
-npm run tauri dev
-```
-
-**Build**:
-```bash
-npm run tauri build
-```
-
-### First Run
-
-1. Launch UmbraRelay
-2. Navigate to "Sources"
-3. Add an RSS feed or GitHub source
-4. Click "Sync" to fetch items
-5. View items in "Inbox"
-
-See [First Run Guide](documentation/getting-started/first-run.md) for details.
+For detailed instructions, see the [Getting Started Guide](documentation/getting-started/).
 
 ## Documentation
 
-Comprehensive documentation is available in the `documentation/` folder:
+Comprehensive documentation is available in the [`documentation/`](documentation/) folder:
 
 - **[Getting Started](documentation/getting-started/)** - Installation and basic usage
 - **[User Guide](documentation/user-guide/)** - Detailed feature documentation
 - **[Technical Docs](documentation/technical/)** - Architecture and development
-- **[Console Commands](documentation/technical/console-commands.md)** - Power user console commands
 - **[Examples](documentation/examples/)** - Configuration examples and use cases
 
-## Configuration
-
-UmbraRelay can be configured via TOML file or UI. See [Configuration Guide](documentation/user-guide/configuration.md).
-
-**Example config** (`umbrarelay.toml`):
-```toml
-[github]
-poll_interval = "5m"
-
-[[github.repos]]
-owner = "dev-syndicate"
-repo = "UmbraRelay"
-assigned_only = true
-
-[[rss]]
-name = "Hacker News"
-url = "https://news.ycombinator.com/rss"
-poll_interval = "10m"
-```
-
 ## Tech Stack
+
+Built with modern, privacy-respecting technologies:
 
 - **Frontend**: Vue 3 + TypeScript + Vite
 - **Backend**: Rust + Tauri
@@ -84,7 +53,7 @@ poll_interval = "10m"
 
 ## Development
 
-See [Development Guide](documentation/technical/development.md) for setup and contribution guidelines.
+For development setup and contribution guidelines, see the [Development Guide](documentation/technical/development.md).
 
 ## License
 
@@ -92,4 +61,4 @@ See [Development Guide](documentation/technical/development.md) for setup and co
 
 ## Contributing
 
-Contributions welcome! See [Development Guide](documentation/technical/development.md) for details.
+Contributions welcome! See the [Development Guide](documentation/technical/development.md) for details.

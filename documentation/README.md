@@ -12,7 +12,7 @@ Welcome to the UmbraRelay documentation. UmbraRelay is a local-first desktop inb
 ### User Guide
 - [Inbox Management](user-guide/inbox-management.md) - Managing your inbox items
 - [Adding Sources](user-guide/adding-sources.md) - Adding RSS feeds and GitHub sources
-- [Configuration](user-guide/configuration.md) - Configuring UmbraRelay via TOML or UI
+- [Configuration](user-guide/configuration.md) - Configuring UmbraRelay settings
 - [Troubleshooting](user-guide/troubleshooting.md) - Common issues and solutions
 
 ### Technical Documentation
@@ -24,7 +24,7 @@ Welcome to the UmbraRelay documentation. UmbraRelay is a local-first desktop inb
 - [Development](technical/development.md) - Development setup and contribution guide
 
 ### Examples
-- [Config Examples](examples/config-examples.md) - Example TOML configurations
+- [Source Setup Examples](examples/config-examples.md) - Example source configurations
 - [Use Cases](examples/use-cases.md) - Real-world usage scenarios
 
 ## Quick Links

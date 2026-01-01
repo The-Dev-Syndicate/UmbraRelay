@@ -23,6 +23,6 @@ Welcome to UmbraRelay! This section will help you get up and running quickly.
 ## Need Help?
 
 - Check [Troubleshooting](../user-guide/troubleshooting.md) for common issues
-- See [Examples](../examples/config-examples.md) for configuration examples
+- See [Use Cases](../examples/use-cases.md) for usage examples
 - Review [Configuration Guide](../user-guide/configuration.md) for detailed config options
 

@@ -24,7 +24,7 @@ This documentation is for:
 UmbraRelay is organized into modules:
 
 - **storage/**: Database models and CRUD operations
-- **config/**: Configuration management (TOML, secure storage)
+- **config/**: Secure token storage
 - **ingestion/**: RSS and GitHub ingestion
 - **normalization/**: Deduplication and normalization
 - **commands/**: Tauri command handlers

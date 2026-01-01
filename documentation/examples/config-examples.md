@@ -1,156 +1,80 @@
-# Configuration Examples
+# Source Setup Examples
 
-Example TOML configurations for various use cases.
+Example source configurations for various use cases. All sources are configured through the UmbraRelay UI.
 
-## Minimal RSS-Only Config
+## Minimal Setup
 
-```toml
-[[rss]]
-name = "Hacker News"
-url = "https://news.ycombinator.com/rss"
-```
+**RSS Feed Only**:
+1. Add RSS feed: "Hacker News"
+2. URL: `https://news.ycombinator.com/rss`
+3. Poll interval: 10m (default)
 
-## GitHub-Only Config
+## GitHub-Only Setup
 
-```toml
-[github]
-poll_interval = "5m"
+**Track GitHub Issues/PRs**:
+1. Add GitHub source: "My Project"
+2. Owner: `dev-syndicate`
+3. Repository: `UmbraRelay`
+4. Assigned Only: Enabled
+5. Poll interval: 5m
 
-[[github.repos]]
-owner = "dev-syndicate"
-repo = "UmbraRelay"
-assigned_only = true
-```
+## Mixed Sources Setup
 
-## Mixed Sources Config
+**Combine GitHub and RSS**:
+1. Add GitHub source: "Main Project"
+   - Owner: `dev-syndicate`
+   - Repository: `UmbraRelay`
+   - Assigned Only: Enabled
+   - Poll interval: 5m
 
-```toml
-[github]
-poll_interval = "5m"
+2. Add GitHub source: "Side Project"
+   - Owner: `rust-lang`
+   - Repository: `rust`
+   - Assigned Only: Disabled
+   - Poll interval: 5m
 
-[[github.repos]]
-owner = "dev-syndicate"
-repo = "UmbraRelay"
-assigned_only = true
+3. Add RSS feed: "Hacker News"
+   - URL: `https://news.ycombinator.com/rss`
+   - Poll interval: 10m
 
-[[github.repos]]
-owner = "rust-lang"
-repo = "rust"
-assigned_only = false
-
-[[rss]]
-name = "Hacker News"
-url = "https://news.ycombinator.com/rss"
-poll_interval = "10m"
-
-[[rss]]
-name = "Lobsters"
-url = "https://lobste.rs/rss"
-poll_interval = "15m"
-```
-
-## Advanced Polling Intervals
-
-```toml
-[github]
-poll_interval = "5m"
-
-[[github.repos]]
-owner = "user"
-repo = "repo"
-assigned_only = true
-
-[[rss]]
-name = "Fast Feed"
-url = "https://example.com/feed.xml"
-poll_interval = "5m"  # Check every 5 minutes
-
-[[rss]]
-name = "Slow Feed"
-url = "https://example.com/slow-feed.xml"
-poll_interval = "1h"  # Check every hour
-```
-
-## Multiple GitHub Repos
-
-```toml
-[github]
-poll_interval = "5m"
-
-[[github.repos]]
-owner = "user1"
-repo = "project1"
-assigned_only = true
-
-[[github.repos]]
-owner = "user1"
-repo = "project2"
-assigned_only = true
-
-[[github.repos]]
-owner = "org"
-repo = "public-repo"
-assigned_only = false
-```
+4. Add RSS feed: "Lobsters"
+   - URL: `https://lobste.rs/rss`
+   - Poll interval: 15m
 
 ## Developer Workflow
 
-```toml
-[github]
-poll_interval = "3m"  # Check frequently for issues/PRs
-
-[[github.repos]]
-owner = "my-org"
-repo = "main-project"
-assigned_only = true
-
-[[github.repos]]
-owner = "my-org"
-repo = "side-project"
-assigned_only = true
-
-[[rss]]
-name = "Tech News"
-url = "https://tech-news.example.com/rss"
-poll_interval = "30m"  # Less frequent for news
-```
+**Frequent GitHub Updates**:
+1. Add GitHub sources for your active projects
+2. Set poll interval to 3-5 minutes
+3. Enable "Assigned Only" to reduce noise
+4. Add RSS feed for tech news (30m interval)
 
 ## News Aggregation
 
-```toml
-[[rss]]
-name = "Hacker News"
-url = "https://news.ycombinator.com/rss"
-poll_interval = "15m"
+**Multiple RSS Feeds**:
+1. Add RSS feed: "Hacker News" (15m interval)
+2. Add RSS feed: "Lobsters" (15m interval)
+3. Add RSS feed: "TechCrunch" (30m interval)
+4. Add RSS feed: "Dev.to" (30m interval)
 
-[[rss]]
-name = "Lobsters"
-url = "https://lobste.rs/rss"
-poll_interval = "15m"
+## Poll Interval Guidelines
 
-[[rss]]
-name = "Reddit Programming"
-url = "https://www.reddit.com/r/programming/.rss"
-poll_interval = "20m"
-
-[[rss]]
-name = "Dev.to"
-url = "https://dev.to/feed"
-poll_interval = "30m"
-```
-
-## Notes
-
-- **GitHub tokens** are NOT stored in TOML (stored securely)
-- **Poll intervals** use format: `5m`, `10m`, `1h`, etc.
-- **Comments** start with `#`
-- **Arrays** use `[[key]]` syntax in TOML
+- **GitHub**: 5-10 minutes (respects rate limits)
+- **RSS News**: 15-30 minutes
+- **RSS Blogs**: 30-60 minutes
+- **Fast Updates**: 5 minutes (use sparingly)
 
 ## Best Practices
 
 1. **Start Simple**: Begin with 1-2 sources
-2. **Test Intervals**: Find optimal poll intervals
+2. **Test Intervals**: Find optimal poll frequencies
 3. **Respect APIs**: Don't poll too frequently
 4. **Descriptive Names**: Use clear source names
-5. **Backup Config**: Keep config in version control (without tokens)
+5. **Monitor Performance**: Adjust based on app performance
 
+## Tips
+
+- Use "Assigned Only" for GitHub to reduce noise
+- Adjust poll intervals based on source update frequency
+- Disable sources you're not actively monitoring
+- Use manual sync for on-demand updates

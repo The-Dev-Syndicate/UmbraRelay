@@ -1,118 +1,36 @@
 # Configuration
 
-UmbraRelay can be configured via TOML file or UI. This guide covers both methods.
+UmbraRelay is configured entirely through the user interface. All settings are stored locally in the SQLite database.
 
-## Config File Location
+## Source Configuration
 
-By default, UmbraRelay stores its configuration at:
-- **All platforms**: `~/.config/umbrarelay/config.toml`
+Sources are configured when you add them through the UI. See [Adding Sources](adding-sources.md) for detailed instructions.
 
-The path supports `~` expansion for your home directory.
+### RSS Feed Configuration
 
-### Custom Config Location
+When adding an RSS feed, you can configure:
 
-You can override the config file location by setting the `UMBRARELAY_CONFIG_PATH` environment variable:
+- **Name**: A friendly name for the feed
+- **URL**: The RSS feed URL
+- **Poll Interval**: How often to check for new items (default: 10 minutes)
+  - Format: `5m`, `10m`, `30m`, `1h`, `2h`
+  - Minimum: 1 minute (not recommended)
+  - Maximum: No limit (but be respectful of feed providers)
 
-```bash
-# Example: Use a custom location
-export UMBRARELAY_CONFIG_PATH="$HOME/.config/umbrarelay/config.toml"
+### GitHub Source Configuration
 
-# Or use an absolute path
-export UMBRARELAY_CONFIG_PATH="/path/to/my/config.toml"
+When adding a GitHub source, you can configure:
 
-# Supports ~ expansion
-export UMBRARELAY_CONFIG_PATH="~/.my-custom-config/umbrarelay.toml"
-```
-
-**Note**: The database will still be stored in the default app data directory, only the config file location is affected.
-
-## TOML Syntax Basics
-
-TOML (Tom's Obvious Minimal Language) is a simple configuration format:
-
-```toml
-# Comments start with #
-
-[key]
-value = "string"
-number = 42
-boolean = true
-
-[[array]]
-item = "value"
-```
-
-## Config Structure
-
-### Global GitHub Settings
-
-```toml
-[github]
-poll_interval = "5m"  # Default poll interval for all GitHub sources
-```
-
-### GitHub Repositories
-
-```toml
-[[github.repos]]
-owner = "username"
-repo = "repository-name"
-assigned_only = true  # Only show issues/PRs assigned to you
-```
-
-### RSS Feeds
-
-```toml
-[[rss]]
-name = "Feed Name"
-url = "https://example.com/feed.xml"
-poll_interval = "10m"  # Optional, defaults to 10m
-```
-
-## Complete Example
-
-```toml
-[github]
-poll_interval = "5m"
-
-[[github.repos]]
-owner = "dev-syndicate"
-repo = "UmbraRelay"
-assigned_only = true
-
-[[github.repos]]
-owner = "rust-lang"
-repo = "rust"
-assigned_only = false
-
-[[rss]]
-name = "Hacker News"
-url = "https://news.ycombinator.com/rss"
-poll_interval = "10m"
-
-[[rss]]
-name = "Lobsters"
-url = "https://lobste.rs/rss"
-poll_interval = "15m"
-```
-
-## UI vs TOML Configuration
-
-### UI Configuration
-
-- **Easier**: No need to edit files
-- **Immediate**: Changes take effect immediately
-- **Limited**: Some advanced options may require TOML
-
-### TOML Configuration
-
-- **Powerful**: Full control over configuration
-- **Version Control**: Can be tracked in git
-- **Requires Restart**: Changes require app restart or config reload
+- **Name**: A friendly name for the source
+- **Owner**: GitHub username or organization
+- **Repository**: Repository name
+- **GitHub Token**: Personal access token (stored securely)
+- **Assigned Only**: Only show issues/PRs assigned to you
+- **Poll Interval**: How often to check for new items (default: 5 minutes)
 
 ## Poll Interval Format
 
-Poll intervals use a simple format:
+Poll intervals use a simple time format:
 
 - `5s` - 5 seconds
 - `1m` - 1 minute
@@ -122,43 +40,51 @@ Poll intervals use a simple format:
 - `1h` - 1 hour
 - `2h` - 2 hours
 
-## Reloading Configuration
-
-Currently, configuration changes require:
-1. Save the TOML file
-2. Restart UmbraRelay
-
-Future versions may support hot-reload.
-
 ## GitHub Token Storage
 
-**Important**: GitHub tokens are NOT stored in the TOML file for security.
+**Important**: GitHub tokens are stored securely:
 
-Tokens are stored:
-- Securely using Tauri's secure storage
-- Encrypted on disk
-- Per-source basis
+- Tokens are encrypted using Tauri's secure storage
+- Stored locally on your machine
+- Never transmitted to external services
+- Per-source basis (each source has its own token)
 
 To update a token:
 - Use the UI to edit the source
-- Or remove and re-add the source
+- Or remove and re-add the source with a new token
+
+## Editing Sources
+
+To modify a source's configuration:
+
+1. Navigate to **Sources** in the sidebar
+2. Find the source you want to edit
+3. Click the **Edit** button
+4. Modify any settings (name, URL, poll interval, etc.)
+5. Save your changes
+
+Changes take effect immediately.
+
+## Enabling/Disabling Sources
+
+You can temporarily disable sources without deleting them:
+
+- Toggle the **Enabled** switch next to any source
+- Disabled sources won't be polled automatically
+- Items from disabled sources remain in your inbox
+- You can manually sync disabled sources
 
 ## Best Practices
 
-1. **Backup Config**: Keep a backup of your config file
-2. **Version Control**: Track config in git (but exclude tokens)
-3. **Test Changes**: Test config changes with one source first
-4. **Poll Intervals**: Be respectful of API rate limits
-5. **Descriptive Names**: Use clear names for sources
+1. **Start Small**: Begin with 1-2 sources to get familiar
+2. **Test Intervals**: Find optimal poll intervals for your workflow
+3. **Respect APIs**: Don't poll too frequently (especially GitHub)
+4. **Descriptive Names**: Use clear, descriptive names for sources
+5. **Monitor Rate Limits**: GitHub has rate limits (5000 requests/hour for authenticated)
 
 ## Troubleshooting
 
-- **Config Not Loading**: Check file syntax and location
+- **Source Not Syncing**: Check if source is enabled
 - **Invalid Poll Interval**: Use format like `5m` or `1h`
-- **Missing Sources**: Verify TOML syntax is correct
+- **GitHub Auth Errors**: Verify token has correct scopes
 - See [Troubleshooting Guide](troubleshooting.md) for more help
-
-## Examples
-
-See [Config Examples](../examples/config-examples.md) for more examples.
-

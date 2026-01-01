@@ -89,5 +89,5 @@ Use the filter buttons at the top:
 
 - [Inbox Management](../user-guide/inbox-management.md) - Advanced inbox features
 - [Adding Sources](../user-guide/adding-sources.md) - Detailed source configuration
-- [Configuration](../user-guide/configuration.md) - TOML configuration guide
+- [Configuration](../user-guide/configuration.md) - Configuration guide
 

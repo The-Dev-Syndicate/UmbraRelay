@@ -184,7 +184,7 @@ sqlite3 umbrarelay.db "SELECT * FROM items LIMIT 10;"
 ### Runtime Errors
 
 - **Database**: Check database file permissions
-- **Config**: Verify TOML syntax
+- **Config**: Check source configuration in database
 - **Tokens**: Check token storage
 
 ## Future Work
