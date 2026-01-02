@@ -40,6 +40,7 @@ export function useSources() {
         config_json: update.config_json,
         enabled: update.enabled,
         token: update.token,
+        secret_id: update.secret_id,
         group_ids: update.group_ids ? (Array.isArray(update.group_ids) ? [...update.group_ids] : update.group_ids) : undefined,
       };
       

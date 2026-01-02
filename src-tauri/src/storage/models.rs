@@ -146,4 +146,33 @@ impl CustomView {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Secret {
+    pub id: i64,
+    pub name: String,
+    pub ttl_type: String, // 'relative', 'absolute', or 'forever'
+    pub ttl_value: Option<String>, // relative duration (e.g., "30d") or absolute date (ISO 8601)
+    pub expires_at: Option<i64>, // calculated expiry timestamp (NULL for forever)
+    pub refresh_token_id: Option<i64>, // ID of the refresh token secret (stored separately)
+    pub refresh_failure_count: i64, // Number of consecutive refresh failures
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+impl Secret {
+    pub fn from_row(row: &Row) -> rusqlite::Result<Secret> {
+        Ok(Secret {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            ttl_type: row.get(2)?,
+            ttl_value: row.get(3)?,
+            expires_at: row.get(4)?,
+            refresh_token_id: row.get(5).ok(),
+            refresh_failure_count: row.get(6).unwrap_or(0),
+            created_at: row.get(7)?,
+            updated_at: row.get(8)?,
+        })
+    }
+}
+
 

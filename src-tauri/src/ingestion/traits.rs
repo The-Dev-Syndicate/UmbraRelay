@@ -14,6 +14,7 @@ pub struct IngestedItem {
     pub author: Option<String>,
     pub category: Option<Vec<String>>,
     pub comments: Option<String>,
+    pub thread_id: Option<String>, // For GitHub notification synchronization
 }
 
 pub trait IngestSource: Send + Sync {

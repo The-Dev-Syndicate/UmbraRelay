@@ -200,6 +200,7 @@ impl IngestSource for AtomIngester {
                     author,
                     category,
                     comments,
+                    thread_id: None,
                 }
             })
             .collect();
