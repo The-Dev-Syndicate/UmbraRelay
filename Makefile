@@ -37,7 +37,11 @@ release:
 	if [ "$$confirm_lower" = "y" ] || [ "$$confirm_lower" = "yes" ]; then \
 		echo ""; \
 		echo "Running pre-release checks..."; \
-		$(MAKE) ts-check || (echo ""; echo "❌ Pre-release checks failed! Aborting release."; exit 1); \
+		if ! $(MAKE) ts-check; then \
+			echo ""; \
+			echo "❌ Pre-release checks failed! Aborting release."; \
+			exit 1; \
+		fi; \
 		echo ""; \
 		echo "Creating tag v$(VERSION)..."; \
 		git tag v$(VERSION) || exit 1; \
