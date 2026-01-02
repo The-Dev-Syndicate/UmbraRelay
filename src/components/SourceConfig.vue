@@ -1287,7 +1287,7 @@ const getGroupSourceCount = (groupId: number): number => {
 // Get count of sources using a secret
 const getSecretSourceCount = (secretId: number): number => {
   let count = 0;
-  for (const [sourceId, mappedSecretId] of sourceSecretMap.value.entries()) {
+  for (const [, mappedSecretId] of sourceSecretMap.value.entries()) {
     if (mappedSecretId === secretId) {
       count++;
     }

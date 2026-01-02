@@ -174,7 +174,6 @@ import {
   formatDate, 
   stripHtml, 
   parseGitHubNotificationSummary,
-  formatGitHubEventType,
   extractGitHubRepo
 } from '../utils/formatting';
 
