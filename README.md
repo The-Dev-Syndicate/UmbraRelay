@@ -63,7 +63,9 @@ For development setup and contribution guidelines, see the [Development Guide](d
 
 ## License
 
-Pending - All rights reserved I guess for now.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+The MIT License is an open-source license that allows you to use, modify, and distribute the software, as long as you include the original copyright notice and license text. This means you're free to use UmbraRelay in your projects, but please give credit where credit is due!
 
 ## Contributing
 
