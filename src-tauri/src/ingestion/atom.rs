@@ -1,46 +1,9 @@
 use super::traits::{IngestSource, IngestedItem};
+use super::utils;
 use anyhow::{Result, Context};
 use reqwest::blocking::Client;
 use atom_syndication::{Feed, Entry};
 use std::time::Duration;
-use regex::Regex;
-
-// Strip HTML tags and decode entities from text
-fn strip_html(html: &str) -> String {
-    // Remove HTML tags using regex
-    let re = Regex::new(r"<[^>]*>").unwrap_or_else(|_| Regex::new("").unwrap());
-    let mut text = re.replace_all(html, "").to_string();
-    
-    // Decode common HTML entities
-    text = text.replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&amp;", "&")
-        .replace("&quot;", "\"")
-        .replace("&#39;", "'")
-        .replace("&nbsp;", " ")
-        .replace("&apos;", "'");
-    
-    // Remove common unwanted patterns like "Comments" links
-    let lines: Vec<&str> = text.lines().collect();
-    let filtered_lines: Vec<&str> = lines.iter()
-        .filter(|line| {
-            let trimmed = line.trim().to_lowercase();
-            !trimmed.eq("comments") 
-                && !trimmed.starts_with("comments")
-                && !trimmed.eq("read more")
-                && !trimmed.is_empty()
-        })
-        .copied()
-        .collect();
-    
-    let cleaned = filtered_lines.join(" ").trim().to_string();
-    
-    if cleaned.to_lowercase().trim() == "comments" || cleaned.trim().is_empty() {
-        return String::new();
-    }
-    
-    cleaned
-}
 
 pub struct AtomIngester {
     url: String,
@@ -58,7 +21,7 @@ impl AtomIngester {
     }
 }
 
-// Extract content from ATOM entry content element
+/// Extracts content from ATOM entry, trying content element first, then summary fallback.
 fn extract_content(entry: &Entry) -> Option<String> {
     // Try content first
     if let Some(content) = entry.content() {
@@ -79,7 +42,7 @@ fn extract_content(entry: &Entry) -> Option<String> {
         .map(|s| s.value.clone())
 }
 
-// Extract image URL from entry links (enclosure or media)
+/// Extracts image URL from ATOM entry links with rel="enclosure" and image MIME type.
 fn extract_image_url(entry: &Entry) -> Option<String> {
     // Look for link with rel="enclosure" that has an image type
     for link in entry.links() {
@@ -137,7 +100,7 @@ impl IngestSource for AtomIngester {
                         if s.value.is_empty() {
                             None
                         } else {
-                            let cleaned = strip_html(&s.value);
+                            let cleaned = utils::strip_html(&s.value);
                             if cleaned.is_empty() { None } else { Some(cleaned) }
                         }
                     });

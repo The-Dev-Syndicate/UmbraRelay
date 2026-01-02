@@ -42,14 +42,55 @@
         </div>
       </div>
 
+      <!-- Source Type Header -->
+      <div v-if="isGitHubNotification" class="item-source-header notification-header">
+        <div class="source-header-icon">🔔</div>
+        <div class="source-header-content">
+          <div class="source-header-title">GitHub Notification</div>
+          <div class="source-header-subtitle">This is a notification from GitHub about activity you're subscribed to</div>
+        </div>
+      </div>
+      <div v-else-if="isGitHubEvent" class="item-source-header event-header">
+        <div class="source-header-icon">⚡</div>
+        <div class="source-header-content">
+          <div class="source-header-title">GitHub Activity</div>
+          <div class="source-header-subtitle">This is an activity event from a repository you're watching</div>
+        </div>
+      </div>
+      <div v-else-if="isGitHubItem" class="item-source-header github-header">
+        <div class="source-header-icon">📦</div>
+        <div class="source-header-content">
+          <div class="source-header-title">GitHub {{ formattedItemType }}</div>
+          <div v-if="githubRepo" class="source-header-subtitle">Repository: {{ githubRepo }}</div>
+        </div>
+      </div>
+
       <div class="item-meta">
         <span class="item-date">{{ formatDate(item.created_at) }}</span>
       </div>
 
-      <h1 class="item-title">{{ item.title }}</h1>
+      <h1 class="item-title">{{ displayTitle }}</h1>
+
+      <!-- GitHub Notification/Event Details -->
+      <div v-if="githubNotificationInfo" class="github-info-section">
+        <div class="info-card">
+          <div class="info-row">
+            <span class="info-label">Type:</span>
+            <span class="info-value">{{ githubNotificationInfo.type }}</span>
+          </div>
+          <div v-if="githubNotificationInfo.reason" class="info-row">
+            <span class="info-label">Reason:</span>
+            <span class="info-value">{{ githubNotificationInfo.reason }}</span>
+          </div>
+          <div v-if="githubRepo" class="info-row">
+            <span class="info-label">Repository:</span>
+            <a :href="`https://github.com/${githubRepo}`" target="_blank" rel="noopener noreferrer" class="info-link">{{ githubRepo }}</a>
+          </div>
+        </div>
+      </div>
 
       <!-- RSS 2.0 metadata: author, categories, comments -->
-      <div v-if="item.author || categories.length > 0 || item.comments" class="item-metadata">
+      <div v-if="item.author || (categories.length > 0 && !isGitHubItem) || item.comments" class="item-metadata">
         <div v-if="item.author" class="item-author">
           <span class="metadata-label">Author:</span>
           <span class="metadata-value">{{ item.author }}</span>
@@ -129,7 +170,13 @@ import { ref, computed, onMounted } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import type { Item } from '../types';
-import { formatDate, stripHtml } from '../utils/formatting';
+import { 
+  formatDate, 
+  stripHtml, 
+  parseGitHubNotificationSummary,
+  formatGitHubEventType,
+  extractGitHubRepo
+} from '../utils/formatting';
 
 defineEmits<{
   (e: 'back'): void;
@@ -257,6 +304,58 @@ const openComments = async () => {
     console.error('Failed to open comments URL:', e);
   }
 };
+
+// GitHub-specific computed properties
+const isGitHubNotification = computed(() => {
+  return item.value?.item_type === 'notification';
+});
+
+const isGitHubEvent = computed(() => {
+  return item.value?.item_type === 'event' || 
+         (item.value?.summary?.includes('Event type:') ?? false);
+});
+
+const isGitHubItem = computed(() => {
+  return ['notification', 'event', 'issue', 'pr', 'commit'].includes(item.value?.item_type || '');
+});
+
+const githubNotificationInfo = computed(() => {
+  if (!item.value?.summary) return null;
+  return parseGitHubNotificationSummary(item.value.summary);
+});
+
+const githubRepo = computed(() => {
+  if (!item.value) return null;
+  return extractGitHubRepo(item.value);
+});
+
+const formattedItemType = computed(() => {
+  if (!item.value) return '';
+  const type = item.value.item_type;
+  const typeMap: Record<string, string> = {
+    'issue': 'Issue',
+    'pr': 'Pull Request',
+    'commit': 'Commit',
+    'notification': 'Notification',
+    'event': 'Event',
+  };
+  return typeMap[type] || type.charAt(0).toUpperCase() + type.slice(1);
+});
+
+const displayTitle = computed(() => {
+  if (!item.value) return '';
+  
+  // For GitHub events, clean up the title (remove "PullRequestEvent: repo/name" format)
+  if (isGitHubEvent.value && item.value.title.includes(':')) {
+    const parts = item.value.title.split(':');
+    if (parts.length > 1) {
+      // Return just the repo name, or a cleaner format
+      return parts[1].trim() || item.value.title;
+    }
+  }
+  
+  return item.value.title;
+});
 
 onMounted(() => {
   fetchItem();

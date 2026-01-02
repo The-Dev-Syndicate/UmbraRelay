@@ -12,10 +12,12 @@ impl Database {
     pub fn new(db_path: &str) -> Result<Self> {
         let mut conn = Connection::open(db_path)?;
         
-        // Run migrations
+        // Run migrations - consolidated single migration for v1.0
+        // This represents the final schema state for new installations
         let migrations = Migrations::new(vec![
             M::up(
                 r#"
+                -- Sources table
                 CREATE TABLE IF NOT EXISTS sources (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     type TEXT NOT NULL,
@@ -23,13 +25,12 @@ impl Database {
                     config_json TEXT NOT NULL,
                     enabled INTEGER NOT NULL DEFAULT 1,
                     last_synced_at INTEGER,
+                    secret_id INTEGER REFERENCES secrets(id),
                     created_at INTEGER NOT NULL,
                     updated_at INTEGER NOT NULL
                 );
-                "#
-            ),
-            M::up(
-                r#"
+                
+                -- Items table
                 CREATE TABLE IF NOT EXISTS items (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     source_id INTEGER NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
@@ -39,14 +40,18 @@ impl Database {
                     url TEXT NOT NULL,
                     item_type TEXT NOT NULL,
                     state TEXT NOT NULL DEFAULT 'unread',
+                    image_url TEXT,
+                    content_html TEXT,
+                    author TEXT,
+                    category TEXT,
+                    comments TEXT,
+                    thread_id TEXT,
                     created_at INTEGER NOT NULL,
                     updated_at INTEGER NOT NULL,
                     UNIQUE(source_id, external_id)
                 );
-                "#
-            ),
-            M::up(
-                r#"
+                
+                -- Events table
                 CREATE TABLE IF NOT EXISTS events (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
@@ -54,30 +59,23 @@ impl Database {
                     payload_json TEXT,
                     occurred_at INTEGER NOT NULL
                 );
-                "#
-            ),
-            M::up(
-                r#"
-                CREATE INDEX IF NOT EXISTS idx_items_source_id ON items(source_id);
-                CREATE INDEX IF NOT EXISTS idx_items_state ON items(state);
-                CREATE INDEX IF NOT EXISTS idx_items_created_at ON items(created_at);
-                CREATE INDEX IF NOT EXISTS idx_events_item_id ON events(item_id);
-                "#
-            ),
-            M::up(
-                r#"
-                ALTER TABLE sources ADD COLUMN "group" TEXT;
-                CREATE INDEX IF NOT EXISTS idx_sources_group ON sources("group");
-                "#
-            ),
-            M::up(
-                r#"
-                ALTER TABLE items ADD COLUMN image_url TEXT;
-                ALTER TABLE items ADD COLUMN content_html TEXT;
-                "#
-            ),
-            M::up(
-                r#"
+                
+                -- Groups table
+                CREATE TABLE IF NOT EXISTS groups (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL
+                );
+                
+                -- Source-Groups junction table
+                CREATE TABLE IF NOT EXISTS source_groups (
+                    source_id INTEGER NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
+                    group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+                    PRIMARY KEY (source_id, group_id)
+                );
+                
+                -- Custom views table
                 CREATE TABLE IF NOT EXISTS custom_views (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
@@ -86,111 +84,81 @@ impl Database {
                     created_at INTEGER NOT NULL,
                     updated_at INTEGER NOT NULL
                 );
-                CREATE INDEX IF NOT EXISTS idx_custom_views_name ON custom_views(name);
-                "#
-            ),
-            M::up(
-                r#"
-                ALTER TABLE items ADD COLUMN author TEXT;
-                ALTER TABLE items ADD COLUMN category TEXT;
-                ALTER TABLE items ADD COLUMN comments TEXT;
-                "#
-            ),
-            M::up(
-                r#"
-                CREATE TABLE IF NOT EXISTS groups (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL UNIQUE,
-                    created_at INTEGER NOT NULL,
-                    updated_at INTEGER NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS idx_groups_name ON groups(name);
-                "#
-            ),
-            M::up(
-                r#"
-                CREATE TABLE IF NOT EXISTS source_groups (
-                    source_id INTEGER NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
-                    group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-                    PRIMARY KEY (source_id, group_id)
-                );
-                CREATE INDEX IF NOT EXISTS idx_source_groups_source_id ON source_groups(source_id);
-                CREATE INDEX IF NOT EXISTS idx_source_groups_group_id ON source_groups(group_id);
-                "#
-            ),
-            M::up(
-                r#"
-                -- Drop the legacy group column from sources table
-                -- SQLite doesn't support DROP COLUMN directly, so we use a workaround
-                CREATE TABLE sources_new (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    type TEXT NOT NULL,
-                    name TEXT NOT NULL,
-                    config_json TEXT NOT NULL,
-                    enabled INTEGER NOT NULL DEFAULT 1,
-                    last_synced_at INTEGER,
-                    created_at INTEGER NOT NULL,
-                    updated_at INTEGER NOT NULL
-                );
-                INSERT INTO sources_new (id, type, name, config_json, enabled, last_synced_at, created_at, updated_at)
-                SELECT id, type, name, config_json, enabled, last_synced_at, created_at, updated_at FROM sources;
-                DROP TABLE sources;
-                ALTER TABLE sources_new RENAME TO sources;
-                DROP INDEX IF EXISTS idx_sources_group;
-                "#
-            ),
-            M::up(
-                r#"
+                
+                -- User preferences table
                 CREATE TABLE IF NOT EXISTS user_preferences (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL
                 );
-                CREATE INDEX IF NOT EXISTS idx_user_preferences_key ON user_preferences(key);
-                "#
-            ),
-            M::up(
-                r#"
+                
+                -- Secrets table
                 CREATE TABLE IF NOT EXISTS secrets (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL UNIQUE,
                     ttl_type TEXT NOT NULL DEFAULT 'forever',
                     ttl_value TEXT,
                     expires_at INTEGER,
+                    refresh_token_id INTEGER,
+                    refresh_failure_count INTEGER NOT NULL DEFAULT 0,
                     created_at INTEGER NOT NULL,
                     updated_at INTEGER NOT NULL
                 );
+                
+                -- Indexes
+                CREATE INDEX IF NOT EXISTS idx_items_source_id ON items(source_id);
+                CREATE INDEX IF NOT EXISTS idx_items_state ON items(state);
+                CREATE INDEX IF NOT EXISTS idx_items_created_at ON items(created_at);
+                CREATE INDEX IF NOT EXISTS idx_items_thread_id ON items(thread_id);
+                CREATE INDEX IF NOT EXISTS idx_events_item_id ON events(item_id);
+                CREATE INDEX IF NOT EXISTS idx_groups_name ON groups(name);
+                CREATE INDEX IF NOT EXISTS idx_source_groups_source_id ON source_groups(source_id);
+                CREATE INDEX IF NOT EXISTS idx_source_groups_group_id ON source_groups(group_id);
+                CREATE INDEX IF NOT EXISTS idx_custom_views_name ON custom_views(name);
+                CREATE INDEX IF NOT EXISTS idx_user_preferences_key ON user_preferences(key);
                 CREATE INDEX IF NOT EXISTS idx_secrets_name ON secrets(name);
                 CREATE INDEX IF NOT EXISTS idx_secrets_expires_at ON secrets(expires_at);
-                "#
-            ),
-            M::up(
-                r#"
-                ALTER TABLE sources ADD COLUMN secret_id INTEGER REFERENCES secrets(id);
                 CREATE INDEX IF NOT EXISTS idx_sources_secret_id ON sources(secret_id);
-                "#
-            ),
-            M::up(
-                r#"
-                ALTER TABLE items ADD COLUMN thread_id TEXT;
-                CREATE INDEX IF NOT EXISTS idx_items_thread_id ON items(thread_id);
-                "#
-            ),
-            M::up(
-                r#"
-                ALTER TABLE secrets ADD COLUMN refresh_token_id INTEGER;
-                ALTER TABLE secrets ADD COLUMN refresh_failure_count INTEGER NOT NULL DEFAULT 0;
                 "#
             ),
         ]);
 
-        migrations.to_latest(&mut conn)
-            .map_err(|e| {
-                // Convert migration error to rusqlite error
-                rusqlite::Error::SqliteFailure(
-                    rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_MISUSE),
-                    Some(format!("Migration error: {}", e))
-                )
-            })?;
+        // Try to run migrations, but handle the case where database is already at a higher version
+        match migrations.to_latest(&mut conn) {
+            Ok(_) => {},
+            Err(e) => {
+                // If error is "DatabaseTooFarAhead", the database is already migrated
+                // Check if schema is correct and update version if needed
+                let error_str = format!("{}", e);
+                if error_str.contains("DatabaseTooFarAhead") {
+                    // Verify schema is correct by checking for key tables
+                    let schema_ok = conn.query_row(
+                        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('sources', 'items', 'secrets', 'groups')",
+                        [],
+                        |row| Ok(row.get::<_, i64>(0)? == 4),
+                    ).unwrap_or(false);
+                    
+                    if schema_ok {
+                        // Schema is correct, just update the version to 1 (our consolidated migration)
+                        let _ = conn.execute(
+                            "UPDATE schema_migrations SET version = 1",
+                            [],
+                        );
+                    } else {
+                        // Schema doesn't match, return error
+                        return Err(rusqlite::Error::SqliteFailure(
+                            rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_MISUSE),
+                            Some(format!("Migration error: {}", e))
+                        ));
+                    }
+                } else {
+                    // Other migration error, return it
+                    return Err(rusqlite::Error::SqliteFailure(
+                        rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_MISUSE),
+                        Some(format!("Migration error: {}", e))
+                    ));
+                }
+            }
+        }
 
         // Migrate existing groups from comma-separated strings to groups table
         let _ = Self::migrate_existing_groups(&conn);
@@ -201,7 +169,7 @@ impl Database {
     }
 
 
-    // Source CRUD operations
+    /// Creates a new source with optional group associations and secret reference.
     pub fn create_source(&self, source_type: &str, name: &str, config_json: &str, group_ids: Option<&[i64]>, secret_id: Option<i64>) -> Result<i64> {
         let conn = self.conn.lock().unwrap();
         let now = Utc::now().timestamp();
@@ -307,7 +275,8 @@ impl Database {
         Ok(())
     }
 
-    // Item CRUD operations
+    /// Upserts an item (inserts if new, updates if exists based on source_id + external_id).
+    /// Preserves item state and created_at timestamp on updates.
     pub fn upsert_item(
         &self,
         source_id: i64,
@@ -353,6 +322,8 @@ impl Database {
         }
     }
 
+    /// Retrieves items with optional filtering by state, groups, or source IDs.
+    /// Supports both legacy single group filter and new multi-group filter via group_names.
     pub fn get_items(&self, state_filter: Option<&str>, group_filter: Option<&str>, source_ids: Option<&[i64]>, group_names: Option<&[String]>) -> Result<Vec<Item>> {
         let conn = self.conn.lock().unwrap();
         
@@ -458,7 +429,7 @@ impl Database {
         stmt.query_row(params![id], |row| Item::from_row(row))
     }
 
-    // Cleanup old items (older than specified days, but preserve archived items)
+    /// Deletes items older than specified days, preserving archived items.
     pub fn cleanup_old_items(&self, days: i64) -> Result<usize> {
         let conn = self.conn.lock().unwrap();
         let cutoff_timestamp = Utc::now().timestamp() - (days * 24 * 60 * 60);
@@ -509,7 +480,7 @@ impl Database {
     }
 
 
-    // Update created_at timestamp to make items appear in "leaving soon" (for testing)
+    /// Updates item timestamps to simulate "leaving soon" state (for testing/debugging).
     pub fn make_items_leaving_soon(&self, count: i64) -> Result<usize> {
         let conn = self.conn.lock().unwrap();
         let now = Utc::now().timestamp();
@@ -653,7 +624,7 @@ impl Database {
         Ok(group_ids)
     }
 
-    // Internal helper that takes a connection reference (for use when connection is already locked)
+    /// Internal helper to update source-group relationships (requires already-locked connection).
     fn set_source_groups_internal(conn: &Connection, source_id: i64, group_ids: &[i64]) -> Result<()> {
         // Delete existing relationships
         conn.execute(
@@ -673,7 +644,8 @@ impl Database {
     }
     
 
-    // Migrate existing groups from comma-separated strings to groups table
+    /// Migrates legacy comma-separated group strings from sources table to normalized groups table.
+    /// Only runs if groups table is empty to avoid duplicate migrations.
     fn migrate_existing_groups(conn: &Connection) -> Result<()> {
         // Check if groups table exists and has data
         let has_groups: bool = conn.query_row(
@@ -887,7 +859,8 @@ impl Database {
         Ok(())
     }
 
-    // Helper function to calculate expires_at from TTL
+    /// Calculates expiration timestamp from TTL type and value.
+    /// Supports "forever", "relative" (e.g., "30d"), and "absolute" (RFC3339) formats.
     fn calculate_expires_at(ttl_type: &str, ttl_value: Option<&str>) -> Result<Option<i64>> {
         match ttl_type {
             "forever" => Ok(None),
@@ -915,7 +888,7 @@ impl Database {
         }
     }
 
-    // Helper function to parse relative duration (e.g., "30d", "1h", "2w")
+    /// Parses relative duration strings (e.g., "30d", "1h", "2w") into seconds.
     fn parse_relative_duration(value: &str) -> Result<i64> {
         if value.is_empty() {
             return Err(rusqlite::Error::InvalidParameterName("Empty duration value".to_string()));

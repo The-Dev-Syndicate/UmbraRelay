@@ -62,6 +62,99 @@
   gap: 10px;
 }
 
+.item-source-header {
+  display: flex;
+  align-items: flex-start;
+  gap: $spacing-md;
+  margin-bottom: $spacing-xl;
+  padding: $spacing-lg;
+  border-radius: $radius-md;
+  border-left: 4px solid;
+  
+  .source-header-icon {
+    font-size: 24px;
+    line-height: 1;
+    margin-top: 2px;
+  }
+  
+  .source-header-content {
+    flex: 1;
+  }
+  
+  .source-header-title {
+    font-size: $font-md;
+    font-weight: $font-semibold;
+    color: var(--color-text-primary);
+    margin-bottom: 4px;
+  }
+  
+  .source-header-subtitle {
+    font-size: $font-base;
+    color: var(--color-text-secondary);
+    line-height: 1.4;
+  }
+  
+  &.notification-header {
+    background: var(--color-info-bg);
+    border-left-color: var(--color-info);
+  }
+  
+  &.event-header {
+    background: var(--color-warning-bg);
+    border-left-color: var(--color-warning);
+  }
+  
+  &.github-header {
+    background: var(--color-bg-secondary);
+    border-left-color: var(--color-primary);
+  }
+}
+
+.github-info-section {
+  margin-bottom: $spacing-xl;
+}
+
+.info-card {
+  padding: $spacing-lg;
+  background: var(--color-bg-secondary);
+  border-radius: $radius-md;
+  border: 1px solid var(--color-border-light);
+}
+
+.info-row {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  margin-bottom: $spacing-md;
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.info-label {
+  font-weight: $font-semibold;
+  color: var(--color-text-secondary);
+  min-width: 100px;
+  font-size: $font-base;
+}
+
+.info-value {
+  color: var(--color-text-primary);
+  font-size: $font-base;
+}
+
+.info-link {
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color $transition-base ease;
+  
+  &:hover {
+    color: var(--color-primary-hover);
+    text-decoration: underline;
+  }
+}
+
 .item-meta {
   display: flex;
   gap: $spacing-md;

@@ -135,7 +135,7 @@ fn get_sources_sync(app: &tauri::AppHandle) -> Result<Vec<storage::models::Sourc
     db.get_all_sources()
 }
 
-// Helper function to parse duration strings like "5m", "10m", "1h"
+/// Parses duration strings (e.g., "5m", "10m", "1h") into seconds.
 fn parse_duration(duration_str: &str) -> u64 {
     let duration_str = duration_str.trim();
     
@@ -163,6 +163,7 @@ fn parse_duration(duration_str: &str) -> u64 {
     }
 }
 
+/// Background service that periodically polls enabled sources based on their poll intervals.
 async fn background_polling_service(app: tauri::AppHandle) {
     use std::time::Duration;
     use tokio::time::sleep;
@@ -236,6 +237,7 @@ async fn background_polling_service(app: tauri::AppHandle) {
     }
 }
 
+/// Background task that periodically cleans up expired secrets and disables associated sources.
 async fn cleanup_expired_secrets_task(app: tauri::AppHandle) {
     use std::time::Duration;
     use tokio::time::sleep;
@@ -250,6 +252,7 @@ async fn cleanup_expired_secrets_task(app: tauri::AppHandle) {
     }
 }
 
+/// Internal function to clean up expired secrets and disable sources using them.
 fn cleanup_expired_secrets_internal(app: &tauri::AppHandle) {
     use std::sync::Mutex;
     use tauri::State;
@@ -333,7 +336,7 @@ fn cleanup_expired_secrets_internal(app: &tauri::AppHandle) {
     }
 }
 
-// Migrate existing tokens from TokenStore to secrets table
+/// Migrates legacy tokens from TokenStore to the new secrets system on app startup.
 fn migrate_tokens_to_secrets(app: &tauri::AppHandle) {
     use std::sync::Mutex;
     use tauri::State;
@@ -430,8 +433,8 @@ fn migrate_tokens_to_secrets(app: &tauri::AppHandle) {
     token_store.clear();
 }
 
-// Helper function to migrate a single source's token to a secret (used for on-the-fly migration)
-// This runs in a blocking task to avoid Send trait issues
+/// Migrates a single source's token to a secret (on-the-fly migration).
+/// Runs in a blocking task to avoid Send trait issues.
 fn migrate_source_token_to_secret_blocking(
     app: tauri::AppHandle,
     source_id: i64,
@@ -501,6 +504,8 @@ fn migrate_source_token_to_secret_blocking(
     Ok(secret_id)
 }
 
+/// Syncs a source by creating the appropriate ingester, fetching items, and storing them.
+/// Handles token refresh for GitHub sources on 401 errors.
 pub async fn sync_source_internal(app: &tauri::AppHandle, source: storage::models::Source) -> anyhow::Result<()> {
     use crate::ingestion::{RssIngester, AtomIngester, GitHubIngester, GitHubNotificationsIngester, traits::IngestSource};
     use crate::normalization::normalize_and_dedupe;

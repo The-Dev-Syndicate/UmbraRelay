@@ -5,7 +5,7 @@ export interface Item {
   title: string;
   summary: string | null;
   url: string;
-  item_type: 'rss' | 'atom' | 'issue' | 'pr';
+  item_type: 'rss' | 'atom' | 'issue' | 'pr' | 'notification' | 'event' | 'commit';
   state: 'unread' | 'read' | 'archived';
   created_at: number;
   updated_at: number;

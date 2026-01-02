@@ -11,6 +11,14 @@ UmbraRelay aggregates RSS feeds and GitHub issues/PRs into a unified inbox. All 
 **Umbra** = shadow/quiet (your data stays private)  
 **Relay** = passing signals forward (aggregating information)
 
+## Why UmbraRelay?
+
+As a developer, I found myself drowning in notifications scattered across different platforms—Confluence, Jira, GitHub, email—each using a different mechanism to communicate. I needed a way to aggregate all of them into one unified place.
+
+UmbraRelay isn't perfect (yet!), and it's constantly improving—faster with your help :wink:—but it does allow me to have a unified place for all my notifications that I deem important. I also wanted to separate out work and personal stuff as a fun side quest with the My Views section.
+
+There are plans to build more integrations and improve the ones we have already, so please feel free to drop an issue or fork the repo and start contributing! We'd love to have you join us in development.
+
 ## Key Features
 
 - **Unified Inbox**: Single interface for RSS feeds and GitHub issues/PRs
@@ -59,4 +67,4 @@ Pending - All rights reserved I guess for now.
 
 ## Contributing
 
-Contributions welcome! See the [Development Guide](documentation/technical/development.md) for details.
+Contributions welcome! We'd love to have you join us in making UmbraRelay better. See our [Contributing Guide](CONTRIBUTING.md) for details on how to get started.

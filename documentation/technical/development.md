@@ -126,20 +126,15 @@ cargo clippy
 
 ## Contributing
 
-### Workflow
+For detailed contribution guidelines, including branch naming, commit message format, and PR requirements, see the [Contributing Guide](../../CONTRIBUTING.md).
+
+### Quick Start
 
 1. **Fork** the repository
-2. **Create** a feature branch
+2. **Create** a feature branch following the naming convention: `<issue_number>-<description>`
 3. **Make** your changes
 4. **Test** thoroughly
-5. **Submit** a pull request
-
-### Pull Request Guidelines
-
-- **Description**: Clear description of changes
-- **Testing**: Describe how you tested
-- **Documentation**: Update docs if needed
-- **Breaking Changes**: Note any breaking changes
+5. **Submit** a pull request with the format: `[#<issue_number>] - Title`
 
 ## Architecture Decisions
 

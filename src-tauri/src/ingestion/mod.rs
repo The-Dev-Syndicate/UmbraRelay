@@ -3,6 +3,7 @@ pub mod rss;
 pub mod atom;
 pub mod github;
 pub mod github_notifications;
+pub mod utils;
 
 pub use rss::*;
 pub use atom::*;

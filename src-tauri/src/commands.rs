@@ -117,6 +117,7 @@ pub async fn get_source_secret_id(
         .map_err(|e| format!("Failed to get source secret_id: {}", e))
 }
 
+/// Adds a new source and immediately syncs it in the background.
 #[tauri::command]
 pub async fn add_source(
     app: AppHandle,
@@ -485,6 +486,7 @@ pub async fn get_secret(
         .map_err(|e| format!("Failed to get secret: {}", e))
 }
 
+/// Creates a new secret with optional TTL and refresh token support.
 #[tauri::command]
 pub async fn create_secret(
     app: AppHandle,
@@ -588,6 +590,8 @@ pub async fn get_secret_value(
         .ok_or_else(|| "Secret not found".to_string())
 }
 
+/// Attempts to detect GitHub token expiration by making an API call.
+/// Returns TTL info if expiration detected, None otherwise.
 #[tauri::command]
 pub async fn detect_github_token_expiration(
     token: String,
@@ -687,6 +691,7 @@ pub async fn start_github_oauth() -> Result<serde_json::Value, String> {
     }))
 }
 
+/// Polls GitHub OAuth device flow for token, creating or updating secret on success.
 #[tauri::command]
 pub async fn poll_github_oauth_token(
     app: AppHandle,
@@ -781,7 +786,8 @@ pub async fn get_github_repositories(
     Ok(repos)
 }
 
-// Internal helper to attempt token refresh
+/// Attempts to refresh a GitHub OAuth token using its refresh token.
+/// Resets failure count on success.
 pub(crate) async fn refresh_github_token_internal(
     app: &AppHandle,
     secret_id: i64,
@@ -840,7 +846,7 @@ pub(crate) async fn refresh_github_token_internal(
     Ok(token_pair.access_token)
 }
 
-// Internal helper to expire a secret (set expires_at to now and disable sources)
+/// Expires a secret and disables all sources using it.
 pub(crate) fn expire_secret_internal(app: &AppHandle, secret_id: i64) -> Result<(), String> {
     use std::sync::Mutex;
     use tauri::State;
