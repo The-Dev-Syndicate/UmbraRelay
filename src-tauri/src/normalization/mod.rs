@@ -27,6 +27,7 @@ pub fn normalize_and_dedupe(
             item.author.as_deref(),
             category_json.as_deref(),
             item.comments.as_deref(),
+            item.thread_id.as_deref(),
         )?;
         
         item_ids.push(item_id);

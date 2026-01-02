@@ -13,6 +13,33 @@ UmbraRelay exposes several commands that can be called from the browser console 
 
 ### Database & Maintenance
 
+#### `clear_source_items(sourceName)`
+
+Deletes all items for a specific source by name. Useful for cleaning up unwanted items from a source without deleting the source itself.
+
+**Parameters:**
+- `sourceName` (string, required): The exact name of the source (case-sensitive)
+
+**Returns:**
+- `number`: The number of items deleted
+
+**Example:**
+```javascript
+// Clear all items from a GitHub source
+const deleted = await invoke('clear_source_items', { sourceName: 'My GitHub Source' });
+console.log(`Deleted ${deleted} items`);
+```
+
+**Notes:**
+- The source name must match exactly (case-sensitive)
+- This permanently deletes all items for the source, regardless of state (unread, read, or archived)
+- The source itself is not deleted, only its items
+- Useful for cleaning up test data, removing unwanted notifications, or resetting a source's items
+- After clearing, you may want to sync the source again to fetch fresh items
+- Returns `0` if the source name is not found
+
+---
+
 #### `cleanup_old_items(days?)`
 
 Deletes items older than the specified number of days, while preserving archived items.
@@ -214,6 +241,7 @@ const cmd = async (name, args = {}) => {
 // Use it
 await cmd('make_items_leaving_soon', { count: 7 });
 await cmd('cleanup_old_items', { days: 30 });
+await cmd('clear_source_items', { sourceName: 'My GitHub Source' });
 ```
 
 ### Example Workflow
@@ -232,6 +260,10 @@ location.reload();
 // 4. Clean up old items (keep last 30 days)
 const deleted = await invoke('cleanup_old_items', { days: 30 });
 console.log(`Deleted ${deleted} old items`);
+
+// 5. Clear all items from a specific source
+const cleared = await invoke('clear_source_items', { sourceName: 'My GitHub Source' });
+console.log(`Cleared ${cleared} items from source`);
 ```
 
 ## Safety Notes
@@ -239,6 +271,7 @@ console.log(`Deleted ${deleted} old items`);
 ⚠️ **Warning**: Some commands modify data permanently:
 
 - `cleanup_old_items`: Permanently deletes items (except archived)
+- `clear_source_items`: Permanently deletes all items for a source
 - `make_items_leaving_soon`: Modifies item timestamps (for testing only)
 - `update_item_state`: Changes item states
 - `remove_source`: Deletes sources and all their items

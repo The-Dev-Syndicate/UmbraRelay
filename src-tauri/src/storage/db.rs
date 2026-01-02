@@ -2,7 +2,7 @@ use rusqlite::{Connection, Result, params};
 use rusqlite_migration::{Migrations, M};
 use std::sync::{Arc, Mutex};
 use chrono::Utc;
-use super::models::{Source, Item};
+use super::models::{Source, Item, Secret};
 
 pub struct Database {
     conn: Arc<Mutex<Connection>>,
@@ -148,6 +148,39 @@ impl Database {
                 CREATE INDEX IF NOT EXISTS idx_user_preferences_key ON user_preferences(key);
                 "#
             ),
+            M::up(
+                r#"
+                CREATE TABLE IF NOT EXISTS secrets (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    ttl_type TEXT NOT NULL DEFAULT 'forever',
+                    ttl_value TEXT,
+                    expires_at INTEGER,
+                    created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_secrets_name ON secrets(name);
+                CREATE INDEX IF NOT EXISTS idx_secrets_expires_at ON secrets(expires_at);
+                "#
+            ),
+            M::up(
+                r#"
+                ALTER TABLE sources ADD COLUMN secret_id INTEGER REFERENCES secrets(id);
+                CREATE INDEX IF NOT EXISTS idx_sources_secret_id ON sources(secret_id);
+                "#
+            ),
+            M::up(
+                r#"
+                ALTER TABLE items ADD COLUMN thread_id TEXT;
+                CREATE INDEX IF NOT EXISTS idx_items_thread_id ON items(thread_id);
+                "#
+            ),
+            M::up(
+                r#"
+                ALTER TABLE secrets ADD COLUMN refresh_token_id INTEGER;
+                ALTER TABLE secrets ADD COLUMN refresh_failure_count INTEGER NOT NULL DEFAULT 0;
+                "#
+            ),
         ]);
 
         migrations.to_latest(&mut conn)
@@ -169,12 +202,12 @@ impl Database {
 
 
     // Source CRUD operations
-    pub fn create_source(&self, source_type: &str, name: &str, config_json: &str, group_ids: Option<&[i64]>) -> Result<i64> {
+    pub fn create_source(&self, source_type: &str, name: &str, config_json: &str, group_ids: Option<&[i64]>, secret_id: Option<i64>) -> Result<i64> {
         let conn = self.conn.lock().unwrap();
         let now = Utc::now().timestamp();
         conn.execute(
-            r#"INSERT INTO sources (type, name, config_json, enabled, created_at, updated_at) VALUES (?1, ?2, ?3, 1, ?4, ?4)"#,
-            params![source_type, name, config_json, now],
+            r#"INSERT INTO sources (type, name, config_json, enabled, secret_id, created_at, updated_at) VALUES (?1, ?2, ?3, 1, ?4, ?5, ?5)"#,
+            params![source_type, name, config_json, secret_id, now],
         )?;
         let source_id = conn.last_insert_rowid();
         
@@ -209,7 +242,16 @@ impl Database {
         stmt.query_row(params![id], |row| Source::from_row(row))
     }
 
-    pub fn update_source(&self, id: i64, name: Option<&str>, config_json: Option<&str>, enabled: Option<bool>, group_ids: Option<Option<&[i64]>>) -> Result<()> {
+    pub fn get_source_secret_id(&self, id: i64) -> Result<Option<i64>> {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT secret_id FROM sources WHERE id = ?1",
+            params![id],
+            |row| row.get(0),
+        )
+    }
+
+    pub fn update_source(&self, id: i64, name: Option<&str>, config_json: Option<&str>, enabled: Option<bool>, group_ids: Option<Option<&[i64]>>, secret_id: Option<Option<&i64>>) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         let now = Utc::now().timestamp();
         
@@ -231,6 +273,13 @@ impl Database {
             conn.execute(
                 "UPDATE sources SET enabled = ?1, updated_at = ?2 WHERE id = ?3",
                 params![if enabled { 1 } else { 0 }, now, id],
+            )?;
+        }
+        
+        if let Some(secret_id) = secret_id {
+            conn.execute(
+                "UPDATE sources SET secret_id = ?1, updated_at = ?2 WHERE id = ?3",
+                params![secret_id, now, id],
             )?;
         }
         
@@ -272,6 +321,7 @@ impl Database {
         author: Option<&str>,
         category: Option<&str>,
         comments: Option<&str>,
+        thread_id: Option<&str>,
     ) -> Result<i64> {
         let conn = self.conn.lock().unwrap();
         let now = Utc::now().timestamp();
@@ -287,16 +337,16 @@ impl Database {
             Ok(id) => {
                 // Update existing item
                 conn.execute(
-                    "UPDATE items SET title = ?1, summary = ?2, url = ?3, item_type = ?4, image_url = ?5, content_html = ?6, author = ?7, category = ?8, comments = ?9, updated_at = ?10 WHERE id = ?11",
-                    params![title, summary, url, item_type, image_url, content_html, author, category, comments, now, id],
+                    "UPDATE items SET title = ?1, summary = ?2, url = ?3, item_type = ?4, image_url = ?5, content_html = ?6, author = ?7, category = ?8, comments = ?9, thread_id = ?10, updated_at = ?11 WHERE id = ?12",
+                    params![title, summary, url, item_type, image_url, content_html, author, category, comments, thread_id, now, id],
                 )?;
                 Ok(id)
             }
             Err(_) => {
                 // Insert new item
                 conn.execute(
-                    "INSERT INTO items (source_id, external_id, title, summary, url, item_type, image_url, content_html, author, category, comments, state, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'unread', ?12, ?12)",
-                    params![source_id, external_id, title, summary, url, item_type, image_url, content_html, author, category, comments, now],
+                    "INSERT INTO items (source_id, external_id, title, summary, url, item_type, image_url, content_html, author, category, comments, thread_id, state, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 'unread', ?13, ?13)",
+                    params![source_id, external_id, title, summary, url, item_type, image_url, content_html, author, category, comments, thread_id, now],
                 )?;
                 Ok(conn.last_insert_rowid())
             }
@@ -422,6 +472,32 @@ impl Database {
         Ok(deleted)
     }
 
+    pub fn delete_items_by_source_name(&self, source_name: &str) -> Result<usize> {
+        let conn = self.conn.lock().unwrap();
+        
+        // First find the source by name
+        let source_id: Result<i64, _> = conn.query_row(
+            "SELECT id FROM sources WHERE name = ?1",
+            params![source_name],
+            |row| row.get(0),
+        );
+        
+        match source_id {
+            Ok(id) => {
+                // Delete all items for this source
+                let deleted = conn.execute(
+                    "DELETE FROM items WHERE source_id = ?1",
+                    params![id],
+                )?;
+                Ok(deleted)
+            }
+            Err(_) => {
+                // Source not found
+                Ok(0)
+            }
+        }
+    }
+
     pub fn update_item_state(&self, id: i64, state: &str) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         let now = Utc::now().timestamp();
@@ -431,6 +507,7 @@ impl Database {
         )?;
         Ok(())
     }
+
 
     // Update created_at timestamp to make items appear in "leaving soon" (for testing)
     pub fn make_items_leaving_soon(&self, count: i64) -> Result<usize> {
@@ -670,6 +747,196 @@ impl Database {
         }
 
         Ok(())
+    }
+
+    // Secret operations
+    pub fn create_secret(&self, name: &str, ttl_type: &str, ttl_value: Option<&str>, refresh_token_id: Option<i64>) -> Result<i64> {
+        let conn = self.conn.lock().unwrap();
+        let now = Utc::now().timestamp();
+        
+        // Calculate expires_at from TTL
+        let expires_at = Self::calculate_expires_at(ttl_type, ttl_value)?;
+        
+        conn.execute(
+            "INSERT INTO secrets (name, ttl_type, ttl_value, expires_at, refresh_token_id, refresh_failure_count, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?6)",
+            params![name, ttl_type, ttl_value, expires_at, refresh_token_id, now],
+        )?;
+        Ok(conn.last_insert_rowid())
+    }
+
+    pub fn get_all_secrets(&self) -> Result<Vec<Secret>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, name, ttl_type, ttl_value, expires_at, refresh_token_id, refresh_failure_count, created_at, updated_at FROM secrets ORDER BY created_at DESC"
+        )?;
+        let secrets = stmt.query_map([], |row| Secret::from_row(row))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(secrets)
+    }
+
+    pub fn get_secret(&self, id: i64) -> Result<Secret> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, name, ttl_type, ttl_value, expires_at, refresh_token_id, refresh_failure_count, created_at, updated_at FROM secrets WHERE id = ?1"
+        )?;
+        stmt.query_row(params![id], |row| Secret::from_row(row))
+    }
+
+    pub fn get_secret_by_name(&self, name: &str) -> Result<Option<Secret>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, name, ttl_type, ttl_value, expires_at, refresh_token_id, refresh_failure_count, created_at, updated_at FROM secrets WHERE name = ?1"
+        )?;
+        match stmt.query_row(params![name], |row| Secret::from_row(row)) {
+            Ok(secret) => Ok(Some(secret)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
+    pub fn update_secret(&self, id: i64, name: Option<&str>, ttl_type: Option<&str>, ttl_value: Option<Option<&str>>) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let now = Utc::now().timestamp();
+        
+        if let Some(name) = name {
+            conn.execute(
+                "UPDATE secrets SET name = ?1, updated_at = ?2 WHERE id = ?3",
+                params![name, now, id],
+            )?;
+        }
+        
+        if let Some(ttl_type) = ttl_type {
+            let ttl_val = ttl_value.flatten();
+            let expires_at = Self::calculate_expires_at(ttl_type, ttl_val.as_deref())?;
+            conn.execute(
+                "UPDATE secrets SET ttl_type = ?1, ttl_value = ?2, expires_at = ?3, updated_at = ?4 WHERE id = ?5",
+                params![ttl_type, ttl_val, expires_at, now, id],
+            )?;
+        }
+        
+        Ok(())
+    }
+
+    pub fn delete_secret(&self, id: i64) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM secrets WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    pub fn get_expired_secrets(&self) -> Result<Vec<Secret>> {
+        let conn = self.conn.lock().unwrap();
+        let now = Utc::now().timestamp();
+        let mut stmt = conn.prepare(
+            "SELECT id, name, ttl_type, ttl_value, expires_at, refresh_token_id, refresh_failure_count, created_at, updated_at FROM secrets WHERE expires_at IS NOT NULL AND expires_at < ?1"
+        )?;
+        let secrets = stmt.query_map(params![now], |row| Secret::from_row(row))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(secrets)
+    }
+
+    pub fn get_sources_using_secret(&self, secret_id: i64) -> Result<Vec<i64>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id FROM sources WHERE secret_id = ?1"
+        )?;
+        let source_ids = stmt.query_map(params![secret_id], |row| row.get::<_, i64>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(source_ids)
+    }
+
+    pub fn expire_secret(&self, secret_id: i64) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let now = Utc::now().timestamp();
+        conn.execute(
+            "UPDATE secrets SET expires_at = ?1, updated_at = ?1 WHERE id = ?2",
+            params![now, secret_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn increment_refresh_failure_count(&self, secret_id: i64) -> Result<i64> {
+        let conn = self.conn.lock().unwrap();
+        let now = Utc::now().timestamp();
+        conn.execute(
+            "UPDATE secrets SET refresh_failure_count = refresh_failure_count + 1, updated_at = ?1 WHERE id = ?2",
+            params![now, secret_id],
+        )?;
+        // Get the new count
+        let mut stmt = conn.prepare("SELECT refresh_failure_count FROM secrets WHERE id = ?1")?;
+        let count: i64 = stmt.query_row(params![secret_id], |row| row.get(0))?;
+        Ok(count)
+    }
+
+    pub fn reset_refresh_failure_count(&self, secret_id: i64) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let now = Utc::now().timestamp();
+        conn.execute(
+            "UPDATE secrets SET refresh_failure_count = 0, updated_at = ?1 WHERE id = ?2",
+            params![now, secret_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn set_refresh_token_id(&self, secret_id: i64, refresh_token_id: Option<i64>) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let now = Utc::now().timestamp();
+        conn.execute(
+            "UPDATE secrets SET refresh_token_id = ?1, updated_at = ?2 WHERE id = ?3",
+            params![refresh_token_id, now, secret_id],
+        )?;
+        Ok(())
+    }
+
+    // Helper function to calculate expires_at from TTL
+    fn calculate_expires_at(ttl_type: &str, ttl_value: Option<&str>) -> Result<Option<i64>> {
+        match ttl_type {
+            "forever" => Ok(None),
+            "relative" => {
+                if let Some(value) = ttl_value {
+                    // Parse relative duration (e.g., "30d", "1h", "2w")
+                    let duration = Self::parse_relative_duration(value)?;
+                    let expires_at = Utc::now().timestamp() + duration;
+                    Ok(Some(expires_at))
+                } else {
+                    Ok(None) // No value means forever
+                }
+            }
+            "absolute" => {
+                if let Some(value) = ttl_value {
+                    // Parse ISO 8601 date
+                    let dt = chrono::DateTime::parse_from_rfc3339(value)
+                        .map_err(|e| rusqlite::Error::InvalidParameterName(format!("Invalid date format: {}", e)))?;
+                    Ok(Some(dt.timestamp()))
+                } else {
+                    Ok(None) // No value means forever
+                }
+            }
+            _ => Ok(None), // Unknown type defaults to forever
+        }
+    }
+
+    // Helper function to parse relative duration (e.g., "30d", "1h", "2w")
+    fn parse_relative_duration(value: &str) -> Result<i64> {
+        if value.is_empty() {
+            return Err(rusqlite::Error::InvalidParameterName("Empty duration value".to_string()));
+        }
+        
+        let (num_str, unit) = value.split_at(value.len() - 1);
+        let num: i64 = num_str.parse()
+            .map_err(|e| rusqlite::Error::InvalidParameterName(format!("Invalid number in duration: {}", e)))?;
+        
+        let seconds = match unit {
+            "s" => num,
+            "m" => num * 60,
+            "h" => num * 3600,
+            "d" => num * 86400,
+            "w" => num * 604800,
+            "M" => num * 2592000, // Approximate month (30 days)
+            "y" => num * 31536000, // Approximate year (365 days)
+            _ => return Err(rusqlite::Error::InvalidParameterName(format!("Unknown duration unit: {}", unit))),
+        };
+        
+        Ok(seconds)
     }
 
     // User preferences operations

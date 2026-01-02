@@ -265,6 +265,7 @@ impl IngestSource for RssIngester {
                     author,
                     category,
                     comments,
+                    thread_id: None,
                 }
             })
             .collect();

@@ -126,6 +126,81 @@
   color: var(--color-text-secondary);
 }
 
+.secrets-management-section {
+  border-top: 1px solid var(--color-border);
+  margin-top: $spacing-2xl;
+  padding-top: $spacing-lg;
+}
+
+.section-actions {
+  margin-top: $spacing-md;
+}
+
+.secrets-list {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+  margin-bottom: $spacing-md;
+}
+
+.secret-card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: $radius-md;
+  padding: $spacing-md;
+  box-shadow: $shadow-sm;
+  transition: all $transition-base;
+  
+  &:hover {
+    box-shadow: $shadow-md;
+    border-color: var(--color-primary);
+  }
+}
+
+.secret-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+
+  h3 {
+    margin: 0 0 $spacing-xs 0;
+  }
+}
+
+.secret-meta {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: $font-base;
+  color: var(--color-text-secondary);
+  flex-wrap: wrap;
+}
+
+.ttl-type {
+  text-transform: capitalize;
+  font-weight: $font-medium;
+  padding: 2px 8px;
+  background: var(--color-bg-secondary);
+  border-radius: 4px;
+}
+
+.expiry-info {
+  color: var(--color-text-secondary);
+  font-size: $font-sm;
+}
+
+.secret-count {
+  color: var(--color-text-secondary);
+  font-size: $font-sm;
+  font-weight: $font-medium;
+}
+
+.secret-actions {
+  display: flex;
+  gap: $spacing-sm;
+  align-items: center;
+}
+
 .group-management-section {
   border-top: 1px solid var(--color-border);
   margin-top: $spacing-2xl;
@@ -196,24 +271,65 @@
   gap: $spacing-sm;
 }
 
-.tabs {
-  display: flex;
-  gap: 10px;
-  margin-bottom: $spacing-xl;
+// Source type select with icons
+.source-type-select-wrapper {
+  position: relative;
+  display: inline-block;
+  width: 100%;
 
-  button {
-    padding: 10px $spacing-xl;
+  .source-type-select {
+    width: 100%;
+    padding: 10px 40px 10px 40px;
     border: 1px solid var(--color-border);
     background: var(--color-bg-primary);
-    cursor: pointer;
     border-radius: $radius-sm;
     color: var(--color-text-primary);
+    font-size: $font-base;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 12px;
     transition: all $transition-base;
 
-    &.active {
-      background: var(--color-primary);
-      color: var(--color-primary-text);
+    &:hover {
       border-color: var(--color-primary);
+    }
+
+    &:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 2px rgba(var(--color-primary-rgb), 0.2);
+    }
+  }
+
+  .source-type-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    z-index: 1;
+
+    .icon-emoji {
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .icon-svg {
+      width: 16px;
+      height: 16px;
+      color: var(--color-text-primary);
+    }
+
+    .github-icon {
+      color: var(--color-text-primary);
     }
   }
 }
@@ -301,5 +417,294 @@
   color: var(--color-text-secondary);
   margin-top: $spacing-xs;
   margin-left: 32px;
+}
+
+// OAuth button styling
+.oauth-button {
+  width: 100%;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(135deg, #24292e 0%, #1a1e22 100%);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  &:hover:not(:disabled) {
+    background: linear-gradient(135deg, #2d3339 0%, #212529 100%);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    transform: translateY(-1px);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  &::before {
+    content: '🔐';
+    font-size: 18px;
+    margin-right: 4px;
+  }
+}
+
+.auth-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #e8f5e9;
+  border: 1px solid #4caf50;
+  border-radius: 6px;
+  color: #2e7d32;
+  font-weight: 500;
+
+  .link-button {
+    background: none;
+    border: none;
+    color: #2e7d32;
+    text-decoration: underline;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0;
+    margin-left: 12px;
+
+    &:hover {
+      color: #1b5e20;
+    }
+  }
+}
+
+// Repo multi-select dropdown
+.repo-multiselect {
+  position: relative;
+  
+  .repo-multiselect-header {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 8px;
+    
+    .repo-search-input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid var(--color-border);
+      border-radius: 4px;
+      background: var(--color-bg-card);
+      color: var(--color-text);
+      font-size: 14px;
+      
+      &:focus {
+        outline: none;
+        border-color: var(--color-primary);
+      }
+    }
+    
+    .repo-select-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      
+      .link-button.small {
+        font-size: 12px;
+        padding: 4px 8px;
+      }
+    }
+  }
+  
+  .repo-multiselect-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    max-height: 300px;
+    overflow-y: auto;
+    margin-top: 4px;
+    
+    &.show {
+      display: block;
+    }
+    
+    .repo-multiselect-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      
+      .checkbox-option {
+        margin: 0;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--color-border);
+        background: var(--color-bg-card);
+        transition: all 0.2s;
+        cursor: pointer;
+        
+        &:last-child {
+          border-bottom: none;
+        }
+        
+        &:hover {
+          background: var(--color-bg-hover);
+        }
+        
+        input[type="checkbox"] {
+          margin-right: 8px;
+        }
+      }
+    }
+  }
+  
+  .repo-selected-count {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+  }
+}
+
+// Form group header with actions
+.form-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  
+  label {
+    margin: 0;
+  }
+  
+  .select-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    
+    .link-button.small {
+      font-size: 12px;
+      padding: 4px 8px;
+    }
+  }
+}
+
+// Account Level Data - single column (no grid)
+.checkbox-group.account-data {
+  display: flex !important;
+  flex-direction: column;
+  gap: 8px;
+}
+
+// Repo Level Data - 3 columns
+.checkbox-group.repo-data {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  align-items: start;
+  
+  @media (max-width: 900px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  @media (max-width: 600px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// GitHub auth modal
+.github-auth-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000 !important; // Ensure it's above everything
+}
+
+.github-auth-modal-content {
+  background: var(--color-bg-primary);
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.github-auth-code {
+  font-size: 24px;
+  font-weight: bold;
+  text-align: center;
+  padding: 16px;
+  background: var(--color-bg-card);
+  border: 2px solid var(--color-primary);
+  border-radius: 6px;
+  margin: 16px 0;
+  letter-spacing: 2px;
+  font-family: monospace;
+}
+
+.github-auth-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+  
+  button {
+    flex: 1;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+    
+    &.copy-button {
+      background: var(--color-primary);
+      color: var(--color-primary-text);
+      
+      &:hover {
+        opacity: 0.9;
+      }
+    }
+    
+    &.ok-button {
+      background: var(--color-success);
+      color: white;
+      
+      &:hover {
+        opacity: 0.9;
+      }
+    }
+    
+    &.cancel-button {
+      background: var(--color-bg-secondary);
+      color: var(--color-text-primary);
+      border: 1px solid var(--color-border);
+      
+      &:hover {
+        background: var(--color-bg-hover);
+      }
+    }
+  }
 }
 

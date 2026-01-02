@@ -4,8 +4,6 @@ A local-first desktop inbox aggregator that runs entirely on your machine.
 
 ![UmbraRelay Application Screenshot](public/UmbraRelay.png)
 
-*Screenshot placeholder - replace with actual application screenshot*
-
 ## Overview
 
 UmbraRelay aggregates RSS feeds and GitHub issues/PRs into a unified inbox. All data lives on your machine—no external databases, no cloud services, no tracking.
