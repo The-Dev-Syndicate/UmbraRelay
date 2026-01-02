@@ -10,6 +10,38 @@ use config::{TokenStore, SecretStore};
 use std::sync::Mutex;
 use std::collections::HashMap;
 use tauri::Manager;
+use std::fs::OpenOptions;
+use std::io::Write;
+
+/// Log error to file for debugging on Windows
+/// Tries to write to app data directory, falls back to current directory
+fn log_error_to_file(message: &str) {
+    // Try to get app data directory first
+    let log_path = if let Ok(app_data) = std::env::var("APPDATA") {
+        std::path::PathBuf::from(app_data)
+            .join("UmbraRelay")
+            .join("umbrarelay_error.log")
+    } else if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+        std::path::PathBuf::from(local_app_data)
+            .join("UmbraRelay")
+            .join("umbrarelay_error.log")
+    } else {
+        std::path::PathBuf::from("umbrarelay_error.log")
+    };
+    
+    // Create parent directory if needed
+    if let Some(parent) = log_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    
+    if let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)
+    {
+        let _ = writeln!(file, "[{}] {}", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S"), message);
+    }
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -19,17 +51,37 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
-            // Initialize database
-            let app_data_dir = app.path().app_data_dir()
-                .expect("Failed to get app data directory");
+            // Initialize database with proper error handling
+            let app_data_dir = match app.path().app_data_dir() {
+                Ok(dir) => dir,
+                Err(e) => {
+                    let error_msg = format!("Failed to get app data directory: {}", e);
+                    eprintln!("{}", error_msg);
+                    log_error_to_file(&error_msg);
+                    return Err(e.into());
+                }
+            };
             
-            std::fs::create_dir_all(&app_data_dir)
-                .expect("Failed to create app data directory");
+            if let Err(e) = std::fs::create_dir_all(&app_data_dir) {
+                let error_msg = format!("Failed to create app data directory: {} (path: {:?})", e, app_data_dir);
+                eprintln!("{}", error_msg);
+                log_error_to_file(&error_msg);
+                return Err(e.into());
+            }
             
             let db_path = app_data_dir.join("umbrarelay.db");
-            let db = Database::new(
-                db_path.to_str().expect("Invalid database path")
-            ).expect("Failed to initialize database");
+            // Use to_string_lossy() for Windows compatibility (handles non-UTF8 paths)
+            let db_path_str = db_path.to_string_lossy().to_string();
+            
+            let db = match Database::new(&db_path_str) {
+                Ok(db) => db,
+                Err(e) => {
+                    let error_msg = format!("Failed to initialize database at {}: {}", db_path_str, e);
+                    eprintln!("{}", error_msg);
+                    log_error_to_file(&error_msg);
+                    return Err(format!("Failed to initialize database: {}", e).into());
+                }
+            };
             
             app.manage(Mutex::new(db));
             
@@ -38,8 +90,15 @@ pub fn run() {
             app.manage(Mutex::new(token_store));
             
             // Initialize secret store
-            let secret_store = SecretStore::new(&app_data_dir)
-                .expect("Failed to initialize secret store");
+            let secret_store = match SecretStore::new(&app_data_dir) {
+                Ok(store) => store,
+                Err(e) => {
+                    let error_msg = format!("Failed to initialize secret store: {} (path: {:?})", e, app_data_dir);
+                    eprintln!("{}", error_msg);
+                    log_error_to_file(&error_msg);
+                    return Err(format!("Failed to initialize secret store: {}", e).into());
+                }
+            };
             app.manage(Mutex::new(secret_store));
             
             // Migrate existing tokens to secrets (after all state is initialized)
@@ -122,6 +181,12 @@ pub fn run() {
             commands::test_github_notifications,
         ])
         .run(tauri::generate_context!())
+        .map_err(|e| {
+            let error_msg = format!("Fatal error while running tauri application: {}", e);
+            eprintln!("{}", error_msg);
+            log_error_to_file(&error_msg);
+            e
+        })
         .expect("error while running tauri application");
 }
 
