@@ -8,6 +8,7 @@ help:
 
 start-dev:
 	@echo "Starting development server..."
+	nvm use 20
 	npm run tauri dev
 
 ts-check:

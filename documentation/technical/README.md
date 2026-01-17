@@ -12,6 +12,7 @@ Technical documentation for developers and contributors.
 6. [Console Commands](console-commands.md) - Power user console commands
 7. [Development](development.md) - Development setup and contribution guide
 8. [Release Process](release-process.md) - Creating and publishing releases
+9. [Auto-Updates](auto-updates.md) - How the automatic update system works
 
 ## Target Audience
 

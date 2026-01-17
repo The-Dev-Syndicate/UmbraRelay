@@ -23,6 +23,7 @@ Welcome to the UmbraRelay documentation. UmbraRelay is a local-first desktop inb
 - [API Reference](technical/api-reference.md) - Tauri command API reference
 - [Development](technical/development.md) - Development setup and contribution guide
 - [Release Process](technical/release-process.md) - Creating and publishing releases
+- [Auto-Updates](technical/auto-updates.md) - How the automatic update system works
 
 ### Examples
 - [Source Setup Examples](examples/config-examples.md) - Example source configurations
