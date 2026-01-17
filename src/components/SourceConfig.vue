@@ -3,22 +3,7 @@
     <!-- Sticky Header -->
     <div class="sticky-header">
       <div class="header-left">
-    <h1>Sources</h1>
-      </div>
-      <div class="header-actions">
-        <button @click="openAddGroupPanel" class="action-button">
-          + Add Group
-        </button>
-        <button @click="showAddSourceModal = true" class="action-button primary">
-          + Add Source
-        </button>
-        <button 
-          @click="handleSyncAll" 
-          class="action-button"
-          :disabled="syncingAll"
-        >
-          {{ syncingAll ? 'Syncing...' : 'Sync All' }}
-        </button>
+        <h1>Settings</h1>
       </div>
     </div>
 
@@ -28,7 +13,25 @@
       <button @click="error = null" class="dismiss-error">×</button>
     </div>
 
-    <div class="sources-list">
+    <!-- Sources Section -->
+    <div class="settings-section">
+      <div class="section-header">
+        <h2>Sources</h2>
+        <div class="section-actions">
+          <button @click="showAddSourceModal = true" class="action-button primary">
+            + Add Source
+          </button>
+          <button 
+            @click="handleSyncAll" 
+            class="action-button"
+            :disabled="syncingAll"
+          >
+            {{ syncingAll ? 'Syncing...' : 'Sync All' }}
+          </button>
+        </div>
+      </div>
+      
+      <div class="sources-list">
       <div v-for="source in sources" :key="source.id" class="source-card">
         <div class="source-header">
           <div>
@@ -79,85 +82,17 @@
         </div>
       </div>
     </div>
-
-    <!-- Theme Selector Section -->
-    <div class="theme-selector-section">
-      <label class="theme-selector-label">Theme</label>
-      <div class="theme-options">
-        <label 
-          class="theme-option"
-          :class="{ active: currentTheme === 'system' }"
-        >
-          <input 
-            type="radio" 
-            value="system" 
-            :checked="currentTheme === 'system'"
-            @change="handleThemeChange('system')"
-          />
-          <span class="theme-name">System</span>
-          <span class="theme-preview">
-            <span class="theme-swatch" style="background: #ffffff; border-color: #000000;"></span>
-            <span class="theme-swatch" style="background: #1a1a1a; border-color: #ffffff;"></span>
-            <span class="system-indicator" v-if="currentTheme === 'system'">
-              ({{ systemPreference === 'dark' ? 'Dark' : 'Light' }})
-            </span>
-          </span>
-        </label>
-        <label 
-          class="theme-option"
-          :class="{ active: currentTheme === 'light' }"
-        >
-          <input 
-            type="radio" 
-            value="light" 
-            :checked="currentTheme === 'light'"
-            @change="handleThemeChange('light')"
-          />
-          <span class="theme-name">Light</span>
-          <span class="theme-preview">
-            <span class="theme-swatch" style="background: #ffffff;"></span>
-          </span>
-        </label>
-        <label 
-          class="theme-option"
-          :class="{ active: currentTheme === 'dark' }"
-        >
-          <input 
-            type="radio" 
-            value="dark" 
-            :checked="currentTheme === 'dark'"
-            @change="handleThemeChange('dark')"
-          />
-          <span class="theme-name">Dark</span>
-          <span class="theme-preview">
-            <span class="theme-swatch" style="background: #1a1a1a;"></span>
-          </span>
-        </label>
-        <label 
-          class="theme-option"
-          :class="{ active: currentTheme === 'blue' }"
-        >
-          <input 
-            type="radio" 
-            value="blue" 
-            :checked="currentTheme === 'blue'"
-            @change="handleThemeChange('blue')"
-          />
-          <span class="theme-name">Blue</span>
-          <span class="theme-preview">
-            <span class="theme-swatch" style="background: #2196f3;"></span>
-          </span>
-        </label>
-      </div>
-      <p class="theme-description">
-        Choose how UmbraRelay looks. System follows your OS preference.
-      </p>
     </div>
 
-    <!-- Secrets Management Section -->
-    <div class="secrets-management-section">
+    <!-- Secrets Section -->
+    <div class="settings-section">
       <div class="section-header">
-        <h2>Secrets Management</h2>
+        <h2>Security & Secrets</h2>
+        <div class="section-actions">
+          <button @click="showAddSecretModal = true" class="action-button primary">
+            + Add Secret
+          </button>
+        </div>
       </div>
       
       <div v-if="secretsLoading" class="loading">Loading secrets...</div>
@@ -231,18 +166,17 @@
           </div>
         </div>
       </div>
-      
-      <div class="section-actions">
-        <button @click="showAddSecretModal = true" class="action-button primary">
-          + Add Secret
-        </button>
-      </div>
     </div>
 
-    <!-- Group Management Section -->
-    <div class="group-management-section">
+    <!-- Groups Section -->
+    <div class="settings-section">
       <div class="section-header">
-        <h2>Group Management</h2>
+        <h2>Groups</h2>
+        <div class="section-actions">
+          <button @click="openAddGroupPanel" class="action-button primary">
+            + Add Group
+          </button>
+        </div>
       </div>
       
       <div v-if="groups.length === 0" class="empty-state">
@@ -274,6 +208,101 @@
             </button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Theme Section -->
+    <div class="settings-section">
+      <div class="section-header">
+        <h2>Appearance</h2>
+      </div>
+      
+      <div class="theme-selector-section">
+      <label class="theme-selector-label">Theme</label>
+      <div class="theme-options">
+        <label 
+          class="theme-option"
+          :class="{ active: currentTheme === 'system' }"
+        >
+          <input 
+            type="radio" 
+            value="system" 
+            :checked="currentTheme === 'system'"
+            @change="handleThemeChange('system')"
+          />
+          <span class="theme-name">System</span>
+          <span class="theme-preview">
+            <span class="theme-swatch" style="background: #ffffff; border-color: #000000;"></span>
+            <span class="theme-swatch" style="background: #1a1a1a; border-color: #ffffff;"></span>
+            <span class="system-indicator" v-if="currentTheme === 'system'">
+              ({{ systemPreference === 'dark' ? 'Dark' : 'Light' }})
+            </span>
+          </span>
+        </label>
+        <label 
+          class="theme-option"
+          :class="{ active: currentTheme === 'light' }"
+        >
+          <input 
+            type="radio" 
+            value="light" 
+            :checked="currentTheme === 'light'"
+            @change="handleThemeChange('light')"
+          />
+          <span class="theme-name">Light</span>
+          <span class="theme-preview">
+            <span class="theme-swatch" style="background: #ffffff;"></span>
+          </span>
+        </label>
+        <label 
+          class="theme-option"
+          :class="{ active: currentTheme === 'dark' }"
+        >
+          <input 
+            type="radio" 
+            value="dark" 
+            :checked="currentTheme === 'dark'"
+            @change="handleThemeChange('dark')"
+          />
+          <span class="theme-name">Dark</span>
+          <span class="theme-preview">
+            <span class="theme-swatch" style="background: #1a1a1a;"></span>
+          </span>
+        </label>
+        <label 
+          class="theme-option"
+          :class="{ active: currentTheme === 'blue' }"
+        >
+          <input 
+            type="radio" 
+            value="blue" 
+            :checked="currentTheme === 'blue'"
+            @change="handleThemeChange('blue')"
+          />
+          <span class="theme-name">Blue</span>
+          <span class="theme-preview">
+            <span class="theme-swatch" style="background: #2196f3;"></span>
+          </span>
+        </label>
+        <label 
+          class="theme-option"
+          :class="{ active: currentTheme === 'liquid-glass' }"
+        >
+          <input 
+            type="radio" 
+            value="liquid-glass" 
+            :checked="currentTheme === 'liquid-glass'"
+            @change="handleThemeChange('liquid-glass')"
+          />
+          <span class="theme-name">Liquid Glass</span>
+          <span class="theme-preview">
+            <span class="theme-swatch" style="background: linear-gradient(135deg, rgba(255,255,255,0.7), rgba(255,255,255,0.3)); border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(10px);"></span>
+          </span>
+        </label>
+      </div>
+        <p class="theme-description">
+          Choose how UmbraRelay looks. System follows your OS preference.
+        </p>
       </div>
     </div>
 
@@ -2704,7 +2733,7 @@ const fetchSourcesAndRebuildMap = async () => {
   await buildSourceSecretMap();
 };
 
-const handleThemeChange = async (theme: 'system' | 'light' | 'dark' | 'blue') => {
+const handleThemeChange = async (theme: 'system' | 'light' | 'dark' | 'blue' | 'liquid-glass') => {
   try {
     await setTheme(theme);
   } catch (error) {
@@ -2841,6 +2870,13 @@ onUnmounted(() => {
   if (handler) {
     document.removeEventListener('click', handler);
     delete (window as any).__repoDropdownClickHandler;
+  }
+});
+
+// Expose methods for parent component
+defineExpose({
+  openAddSourceModal: () => {
+    showAddSourceModal.value = true;
   }
 });
 </script>

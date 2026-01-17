@@ -114,3 +114,76 @@
   }
 }
 
+// Liquid Glass Effect - iOS 26 inspired frosted glass
+@mixin liquid-glass($opacity: 0.1, $blur: 20px) {
+  backdrop-filter: blur($blur) saturate(180%);
+  -webkit-backdrop-filter: blur($blur) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, $opacity);
+}
+
+// Icon button base styling
+@mixin icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: $radius-md;
+  cursor: pointer;
+  transition: all $transition-base;
+  position: relative;
+  background: transparent;
+  color: var(--color-text-primary);
+  
+  svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+    transition: transform $transition-base;
+  }
+  
+  &:hover:not(:disabled) {
+    background: var(--color-bg-hover);
+    transform: scale(1.05);
+    
+    svg {
+      transform: scale(1.1);
+    }
+  }
+  
+  &:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  // Tooltip positioning
+  &[data-tooltip]::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: $spacing-xs $spacing-sm;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    font-size: $font-xs;
+    white-space: nowrap;
+    border-radius: $radius-sm;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity $transition-base;
+    z-index: $z-dropdown;
+  }
+  
+  &[data-tooltip]:hover::before {
+    opacity: 1;
+  }
+}

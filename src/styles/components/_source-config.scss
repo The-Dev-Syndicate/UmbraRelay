@@ -14,10 +14,7 @@
   z-index: $z-sticky;
   padding: $spacing-md $spacing-xl;
   margin: (-$spacing-xl) (-$spacing-xl) $spacing-xl (-$spacing-xl);
-  border-bottom: 1px solid var(--color-border-light);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  backdrop-filter: blur(10px);
-  background: var(--color-bg-primary);
+  @include liquid-glass(0.15, 20px);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -39,17 +36,40 @@
   margin-bottom: $spacing-2xl;
 }
 
+.settings-section {
+  margin-bottom: $spacing-3xl;
+  
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: $spacing-lg;
+    
+    h2 {
+      margin: 0;
+      font-size: $font-xl;
+      font-weight: $font-semibold;
+      color: var(--color-text-primary);
+    }
+    
+    .section-actions {
+      display: flex;
+      gap: $spacing-sm;
+      margin-top: 0;
+    }
+  }
+}
+
 .source-card {
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border);
-  border-radius: $radius-md;
-  padding: $spacing-md;
-  box-shadow: $shadow-sm;
+  @include liquid-glass(0.08, 15px);
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
   transition: all $transition-base;
-  margin-bottom: $spacing-sm;
+  margin-bottom: $spacing-md;
   
   &:hover {
-    box-shadow: $shadow-md;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
     border-color: var(--color-primary);
   }
 }
@@ -126,14 +146,9 @@
   color: var(--color-text-secondary);
 }
 
-.secrets-management-section {
-  border-top: 1px solid var(--color-border);
-  margin-top: $spacing-2xl;
-  padding-top: $spacing-lg;
-}
-
 .section-actions {
-  margin-top: $spacing-md;
+  display: flex;
+  gap: $spacing-sm;
 }
 
 .secrets-list {
@@ -153,15 +168,15 @@
     border-left: 4px solid #f57c00;
     background-color: rgba(245, 124, 0, 0.05);
   }
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border);
-  border-radius: $radius-md;
-  padding: $spacing-md;
-  box-shadow: $shadow-sm;
+  
+  @include liquid-glass(0.08, 15px);
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
   transition: all $transition-base;
   
   &:hover {
-    box-shadow: $shadow-md;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
     border-color: var(--color-primary);
   }
 }
@@ -257,11 +272,6 @@
   align-items: center;
 }
 
-.group-management-section {
-  border-top: 1px solid var(--color-border);
-  margin-top: $spacing-2xl;
-  padding-top: $spacing-lg;
-}
 
 .section-header {
   display: flex;
@@ -290,18 +300,17 @@
 }
 
 .group-card {
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border);
-  border-radius: $radius-md;
-  padding: $spacing-md;
-  box-shadow: $shadow-sm;
+  @include liquid-glass(0.08, 15px);
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
   transition: all $transition-base;
   display: flex;
   justify-content: space-between;
   align-items: center;
   
   &:hover {
-    box-shadow: $shadow-md;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
     border-color: var(--color-primary);
   }
 }
@@ -397,9 +406,7 @@
 
 // Theme selector styles
 .theme-selector-section {
-  margin-top: $spacing-2xl;
-  padding-top: $spacing-lg;
-  border-top: 1px solid var(--color-border);
+  margin-top: 0;
 }
 
 .theme-selector-label {
@@ -420,15 +427,15 @@
   align-items: center;
   gap: $spacing-md;
   padding: $spacing-md;
-  border: 2px solid var(--color-border);
-  border-radius: $radius-sm;
+  @include liquid-glass(0.08, 12px);
+  border-radius: $radius-md;
   cursor: pointer;
   transition: all $transition-base;
-  background: var(--color-bg-primary);
 
   &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     border-color: var(--color-primary);
-    background: var(--color-bg-hover);
   }
 
   &.active {
@@ -699,12 +706,13 @@
 }
 
 .github-auth-modal-content {
+  @include liquid-glass(0.95, 20px);
   background: var(--color-bg-primary);
-  border-radius: 8px;
+  border-radius: $radius-lg;
   padding: 24px;
   max-width: 400px;
   width: 90%;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
 .github-auth-code {

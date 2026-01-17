@@ -1,0 +1,98 @@
+// Liquid Glass Theme - iOS 26 inspired frosted glass aesthetic
+// This theme uses semi-transparent backgrounds with backdrop-filter blur for a modern glass morphism effect
+
+.theme-liquid-glass {
+  // Primary colors - vibrant but with glass overlay
+  --color-primary: #5a8de8;
+  --color-primary-hover: #4a7dd8;
+  --color-primary-text: #ffffff;
+  
+  // Background colors - semi-transparent with blur
+  --color-bg-primary: rgba(255, 255, 255, 0.7);
+  --color-bg-secondary: rgba(245, 245, 245, 0.5);
+  --color-bg-card: rgba(255, 255, 255, 0.6);
+  --color-bg-hover: rgba(255, 255, 255, 0.8);
+  --color-bg-panel: rgba(248, 249, 250, 0.7);
+  --color-bg-unread: rgba(248, 249, 255, 0.6);
+  
+  // Text colors - high contrast for readability over glass
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #4a4a4a;
+  --color-text-muted: #7a7a7a;
+  --color-text-inverse: #ffffff;
+  
+  // Border colors - subtle glass edges
+  --color-border: rgba(255, 255, 255, 0.3);
+  --color-border-hover: rgba(255, 255, 255, 0.5);
+  --color-border-light: rgba(255, 255, 255, 0.2);
+  
+  // Shadow colors - soft, diffused shadows
+  --color-shadow: rgba(0, 0, 0, 0.15);
+  
+  // State colors
+  --color-success: #4caf50;
+  --color-success-bg: rgba(76, 175, 80, 0.2);
+  --color-error: #f44336;
+  --color-error-bg: rgba(244, 67, 54, 0.2);
+  --color-warning: #ff9800;
+  --color-warning-bg: rgba(255, 152, 0, 0.2);
+  --color-info: #2196f3;
+  --color-info-bg: rgba(33, 150, 243, 0.2);
+  
+  // Badge colors
+  --color-badge-unread: rgba(33, 150, 243, 0.3);
+  --color-badge-unread-text: #1976d2;
+  --color-badge-read: rgba(76, 175, 80, 0.3);
+  --color-badge-read-text: #388e3c;
+  --color-badge-archived: rgba(117, 117, 117, 0.3);
+  --color-badge-archived-text: #757575;
+  
+  // Group tag colors
+  --color-group-tag: rgba(33, 150, 243, 0.3);
+  --color-group-tag-text: #1976d2;
+  
+  // Apply backdrop-filter blur to cards and panels
+  * {
+    // Cards get glass effect
+    &[class*="card"],
+    &[class*="panel"],
+    &[class*="modal"] {
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+    }
+  }
+}
+
+// Global glass effect styles for liquid glass theme
+.theme-liquid-glass {
+  // Sticky headers
+  .sticky-header {
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+  }
+  
+  // All cards
+  .item-card,
+  .source-card,
+  .secret-card,
+  .group-card {
+    backdrop-filter: blur(15px) saturate(180%);
+    -webkit-backdrop-filter: blur(15px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  }
+  
+  // Modals and panels
+  .edit-panel,
+  .github-auth-modal-content {
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.2);
+  }
+  
+  // Navigation icons
+  .nav-bottom-actions {
+    backdrop-filter: blur(15px) saturate(180%);
+    -webkit-backdrop-filter: blur(15px) saturate(180%);
+  }
+}

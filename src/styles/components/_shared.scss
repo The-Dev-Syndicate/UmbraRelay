@@ -5,11 +5,9 @@
 
 // Item Card Styles (shared by InboxView, CustomViewView, LeavingSoonView)
 .item-card {
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border);
-  border-radius: $radius-md;
+  @include liquid-glass(0.08, 12px);
+  border-radius: $radius-lg;
   padding: $spacing-md; // More compact padding
-  box-shadow: $shadow-sm;
   transition: all $transition-base;
   cursor: pointer;
   
@@ -311,6 +309,8 @@
 
 .edit-panel {
   @include modal-panel;
+  @include liquid-glass(0.95, 20px);
+  background: var(--color-bg-primary);
 }
 
 .edit-panel-header {

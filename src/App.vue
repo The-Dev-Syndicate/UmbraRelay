@@ -107,24 +107,52 @@
           </div>
         </div>
 
-        <!-- Sources and Add View (moved to bottom, horizontal) -->
+        <!-- Bottom Action Icons -->
         <div class="nav-spacer"></div>
         <div class="nav-bottom-actions">
           <button
             @click="openCreateView"
-            class="nav-button nav-bottom"
-            title="Add View"
+            class="nav-icon-button"
+            data-tooltip="Add View"
+            :class="{ active: showViewConfig }"
           >
-            <span class="nav-icon">➕</span>
-            <span>Add View</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
+          <button
+            @click="handleAddSource"
+            class="nav-icon-button"
+            data-tooltip="Add Source"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
+          <button
+            @click="handleSyncAll"
+            class="nav-icon-button"
+            data-tooltip="Sync All Sources"
+            :disabled="syncingAll"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :class="{ spinning: syncingAll }">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
           </button>
           <button
             :class="{ active: currentView === 'sources' }"
             @click="currentView = 'sources'; selectedItemId = null"
-            class="nav-button nav-bottom"
+            class="nav-icon-button"
+            data-tooltip="Settings"
           >
-            <span class="nav-icon">⚙️</span>
-            <span>Sources</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24"></path>
+            </svg>
           </button>
         </div>
       </div>
@@ -165,7 +193,11 @@
         @edit-view="openEditView(currentView)"
         key="custom-view"
       />
-      <SourceConfig v-else-if="currentView === 'sources'" key="sources" />
+      <SourceConfig 
+        v-else-if="currentView === 'sources'" 
+        key="sources"
+        ref="sourceConfigRef"
+      />
       <div v-else class="fallback">
         <p>Select a view from the sidebar</p>
       </div>
@@ -181,7 +213,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, computed, watch, nextTick } from 'vue';
 import InboxView from './components/InboxView.vue';
 import TodayView from './components/TodayView.vue';
 import LeavingSoonView from './components/LeavingSoonView.vue';
@@ -212,7 +244,10 @@ const previousSourcesExpanded = ref(false);
 const previousMyViewsExpanded = ref(false);
 
 const { customViews, fetchCustomViews, deleteCustomView } = useCustomViews();
-const { sources, fetchSources } = useSources();
+const { sources, fetchSources, syncAllSources } = useSources();
+
+const sourceConfigRef = ref<InstanceType<typeof SourceConfig> | null>(null);
+const syncingAll = ref(false);
 
 // Parse current view to determine if it's a source view
 const currentViewType = computed(() => {
@@ -321,6 +356,30 @@ watch(searchQuery, (newQuery, oldQuery) => {
     }
   }
 });
+
+const handleAddSource = () => {
+  // Navigate to sources page and trigger add source modal
+  currentView.value = 'sources';
+  selectedItemId.value = null;
+  // Use nextTick to ensure SourceConfig is mounted before accessing ref
+  nextTick(() => {
+    if (sourceConfigRef.value && 'openAddSourceModal' in sourceConfigRef.value) {
+      (sourceConfigRef.value as any).openAddSourceModal();
+    }
+  });
+};
+
+const handleSyncAll = async () => {
+  syncingAll.value = true;
+  try {
+    await syncAllSources();
+    await fetchSources();
+  } catch (e) {
+    console.error('Failed to sync all sources:', e);
+  } finally {
+    syncingAll.value = false;
+  }
+};
 
 onMounted(() => {
   console.log('UmbraRelay app mounted');

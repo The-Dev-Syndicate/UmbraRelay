@@ -1,7 +1,7 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 
-export type Theme = 'system' | 'light' | 'dark' | 'blue';
+export type Theme = 'system' | 'light' | 'dark' | 'blue' | 'liquid-glass';
 
 const currentTheme = ref<Theme>('system');
 const systemPreference = ref<'light' | 'dark'>('light');
@@ -52,7 +52,7 @@ function applyThemeClass(theme: Theme) {
   const root = document.documentElement;
   
   // Remove all theme classes
-  root.classList.remove('theme-light', 'theme-dark', 'theme-blue');
+  root.classList.remove('theme-light', 'theme-dark', 'theme-blue', 'theme-liquid-glass');
   
   if (theme === 'system') {
     // Apply light or dark based on system preference
@@ -70,7 +70,7 @@ function applyThemeClass(theme: Theme) {
 async function loadTheme(): Promise<void> {
   try {
     const savedTheme = await invoke<string | null>('get_user_preference', { key: 'theme' });
-    if (savedTheme && ['system', 'light', 'dark', 'blue'].includes(savedTheme)) {
+    if (savedTheme && ['system', 'light', 'dark', 'blue', 'liquid-glass'].includes(savedTheme)) {
       currentTheme.value = savedTheme as Theme;
     } else {
       // Default to 'system' if no preference is saved

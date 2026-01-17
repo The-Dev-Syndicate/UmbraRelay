@@ -1,5 +1,6 @@
 // InboxView Component Styles
 @use '../variables' as *;
+@use '../mixins' as *;
 
 .inbox-view {
   padding: $spacing-lg;
@@ -13,10 +14,7 @@
   z-index: $z-sticky;
   padding: $spacing-md $spacing-xl;
   margin: (-$spacing-lg) (-$spacing-lg) $spacing-lg (-$spacing-lg);
-  border-bottom: 1px solid var(--color-border-light);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  backdrop-filter: blur(10px);
-  background: var(--color-bg-primary);
+  @include liquid-glass(0.15, 20px);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -63,6 +61,45 @@
   flex-wrap: wrap;
   width: 100%;
   justify-content: flex-end;
+}
+
+.sync-source-button {
+  @include icon-button;
+  @include liquid-glass(0.1, 12px);
+  width: 36px;
+  height: 36px;
+  color: var(--color-text-primary);
+  flex-shrink: 0;
+  
+  svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    fill: none;
+    
+    &.spinning {
+      animation: spin 1s linear infinite;
+    }
+  }
+  
+  &:hover:not(:disabled) {
+    background: var(--color-bg-hover);
+    transform: scale(1.05);
+  }
+  
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .search-toggle {

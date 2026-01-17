@@ -1,5 +1,6 @@
 // App.vue Component Styles
 @use '../variables' as *;
+@use '../mixins' as *;
 
 .app {
   display: flex;
@@ -269,8 +270,57 @@
 .nav-bottom-actions {
   display: flex;
   flex-direction: row;
-  gap: $spacing-xs;
+  gap: $spacing-sm;
   margin-top: auto;
+  padding: $spacing-sm;
+  border-radius: $radius-lg;
+  @include liquid-glass(0.15, 15px);
+}
+
+.nav-icon-button {
+  @include icon-button;
+  @include liquid-glass(0.1, 12px);
+  width: 40px;
+  height: 40px;
+  color: rgba(255, 255, 255, 0.9);
+  
+  svg {
+    width: 20px;
+    height: 20px;
+    stroke: currentColor;
+    fill: none;
+  }
+  
+  &.active {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+  
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  svg.spinning {
+    animation: spin 1s linear infinite;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .nav-bottom {

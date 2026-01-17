@@ -7,6 +7,19 @@
       <div class="header-right">
         <div class="filters-wrapper">
           <div class="filters-container">
+            <button
+              v-if="sourceId !== undefined"
+              @click="handleSyncSource"
+              class="sync-source-button"
+              :disabled="syncing"
+              :title="syncing ? 'Syncing...' : 'Sync Source'"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :class="{ spinning: syncing }">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+            </button>
             <div class="filters">
               <button
                 v-for="filter in filters"
@@ -144,7 +157,8 @@ const emit = defineEmits<{
 }>();
 
 const { items, loading, error, fetchItems, updateItemState } = useItems();
-const { sources, fetchSources } = useSources();
+const { sources, fetchSources, syncSource } = useSources();
+const syncing = ref(false);
 const currentFilter = ref<string | null>(null);
 const selectedGroups = ref<string[]>([]);
 const showGroupDropdown = ref(false);
@@ -301,6 +315,20 @@ const handleSearchBlur = (e: FocusEvent) => {
   // Close if search is empty
   if (!searchQuery.value.trim()) {
     searchExpanded.value = false;
+  }
+};
+
+const handleSyncSource = async () => {
+  if (props.sourceId === undefined || syncing.value) return;
+  
+  syncing.value = true;
+  try {
+    await syncSource(props.sourceId);
+    await fetchItems();
+  } catch (e) {
+    console.error('Failed to sync source:', e);
+  } finally {
+    syncing.value = false;
   }
 };
 </script>
