@@ -8,8 +8,7 @@ help:
 
 start-dev:
 	@echo "Starting development server..."
-	nvm use 20
-	npm run tauri dev
+	npm run tauri dev || (echo ""; echo "❌ Development server failed! Make sure to run nvm use 20"; exit 1
 
 ts-check:
 	@echo "Running TypeScript type check..."
