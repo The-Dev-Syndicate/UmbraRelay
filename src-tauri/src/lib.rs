@@ -179,6 +179,7 @@ pub fn run() {
             commands::poll_github_oauth_token,
             commands::get_github_repositories,
             commands::test_github_notifications,
+            commands::test_github_token,
         ])
         .run(tauri::generate_context!())
         .map_err(|e| {

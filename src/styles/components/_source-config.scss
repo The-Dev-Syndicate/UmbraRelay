@@ -144,6 +144,15 @@
 }
 
 .secret-card {
+  &.secret-card-error {
+    border-left: 4px solid #d32f2f;
+    background-color: rgba(211, 47, 47, 0.05);
+  }
+  
+  &.secret-card-warning {
+    border-left: 4px solid #f57c00;
+    background-color: rgba(245, 124, 0, 0.05);
+  }
   background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: $radius-md;
@@ -165,6 +174,53 @@
   h3 {
     margin: 0 0 $spacing-xs 0;
   }
+}
+
+.token-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  
+  &.good {
+    background-color: #4caf50;
+    color: white;
+  }
+  
+  &.warning {
+    background-color: #ff9800;
+    color: white;
+  }
+  
+  &.error {
+    background-color: #d32f2f;
+    color: white;
+  }
+  
+  &.testing {
+    background-color: #2196f3;
+    color: white;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.failure-count {
+  color: #d32f2f;
+  font-weight: 500;
+  font-size: 12px;
 }
 
 .secret-meta {

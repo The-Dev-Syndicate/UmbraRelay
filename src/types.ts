@@ -56,6 +56,7 @@ export interface Secret {
   ttl_type: 'relative' | 'absolute' | 'forever';
   ttl_value?: string | null;
   expires_at?: number | null;
+  refresh_failure_count?: number; // Number of consecutive refresh failures
   created_at: number;
   updated_at: number;
 }

@@ -171,10 +171,24 @@
       </div>
       
       <div v-else-if="!secretsLoading" class="secrets-list">
-        <div v-for="secret in secrets" :key="secret.id" class="secret-card">
+        <div v-for="secret in secrets" :key="secret.id" class="secret-card" :class="getSecretHealthClass(secret)">
           <div class="secret-header">
             <div>
-              <h3>{{ secret.name }}</h3>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <h3>{{ secret.name }}</h3>
+                <span v-if="getSecretHealthStatus(secret) === 'error'" class="token-status-badge error" title="Token has issues">
+                  ⚠️ Token Issues
+                </span>
+                <span v-else-if="getSecretHealthStatus(secret) === 'warning'" class="token-status-badge warning" title="Token may have issues">
+                  ⚠️ Warning
+                </span>
+                <span v-else-if="getSecretHealthStatus(secret) === 'testing'" class="token-status-badge testing" title="Testing token...">
+                  🔄 Testing...
+                </span>
+                <span v-else-if="getSecretHealthStatus(secret) === 'good'" class="token-status-badge good" title="Token is valid">
+                  ✓ Valid
+                </span>
+              </div>
               <div class="secret-meta">
                 <span class="ttl-type">{{ secret.ttl_type }}</span>
                 <span v-if="secret.expires_at" class="expiry-info">
@@ -184,9 +198,20 @@
                 <span class="secret-count">
                   {{ getSecretSourceCount(secret.id) }} source{{ getSecretSourceCount(secret.id) !== 1 ? 's' : '' }}
                 </span>
+                <span v-if="secret.refresh_failure_count && secret.refresh_failure_count > 0" class="failure-count" style="color: #d32f2f; font-weight: 500;">
+                  ({{ secret.refresh_failure_count }} refresh failure{{ secret.refresh_failure_count !== 1 ? 's' : '' }})
+                </span>
               </div>
             </div>
             <div class="secret-actions">
+              <button 
+                @click="testSecretToken(secret.id)" 
+                class="icon-button"
+                :disabled="testingSecrets.has(secret.id)"
+                :title="testingSecrets.has(secret.id) ? 'Testing...' : 'Test Token'"
+              >
+                {{ testingSecrets.has(secret.id) ? '🔄' : '🧪' }}
+              </button>
               <button 
                 @click="editSecret(secret)" 
                 class="icon-button"
@@ -1190,6 +1215,8 @@ const secretsError = ref<string | null>(null);
 const showAddSecretModal = ref(false);
 const editingSecret = ref<any | null>(null);
 const deletingSecrets = ref<Set<number>>(new Set());
+const testingSecrets = ref<Set<number>>(new Set());
+const secretHealthStatus = ref<Map<number, 'good' | 'warning' | 'error' | 'testing'>>(new Map());
 const sourceSecretMap = ref<Map<number, number>>(new Map()); // Maps source_id -> secret_id
 
 const secretForm = ref({
@@ -1350,7 +1377,11 @@ const addGitHubNotificationsSource = async (e?: Event) => {
   
   addingSource.value = true;
   try {
-    const { invoke } = await import('@tauri-apps/api/core');
+    const tauriCore = await import('@tauri-apps/api/core');
+    if (!tauriCore || !tauriCore.invoke) {
+      throw new Error('Tauri API not available. Make sure you are running in a Tauri app.');
+    }
+    const { invoke } = tauriCore;
     
     let secretId = githubNotificationsForm.value.secretId;
     
@@ -1498,8 +1529,13 @@ const addAtomSource = async (e?: Event) => {
 const reauthorizeGitHub = async () => {
   editForm.value.oauthInProgress = true;
   try {
-    const { invoke } = await import('@tauri-apps/api/core');
-    const { openUrl } = await import('@tauri-apps/plugin-opener');
+    const tauriCore = await import('@tauri-apps/api/core');
+    const openerPlugin = await import('@tauri-apps/plugin-opener');
+    if (!tauriCore?.invoke || !openerPlugin?.openUrl) {
+      throw new Error('Tauri API not available. Make sure you are running in a Tauri app.');
+    }
+    const { invoke } = tauriCore;
+    const { openUrl } = openerPlugin;
     
     // Start device flow
     const deviceInfo = await invoke<any>('start_github_oauth');
@@ -1738,7 +1774,12 @@ const handleEditRepoCheckboxClick = (e: MouseEvent) => {
 // Check for existing GitHub secret and load repos
 const checkExistingGitHubAuth = async () => {
   try {
-    const { invoke } = await import('@tauri-apps/api/core');
+    const tauriCore = await import('@tauri-apps/api/core');
+    if (!tauriCore?.invoke) {
+      console.warn('Tauri API not available');
+      return;
+    }
+    const { invoke } = tauriCore;
     const secrets = await invoke<any[]>('get_secrets');
     const githubSecret = secrets.find((s: any) => s.name === 'GitHub Device Flow Token');
     
@@ -1765,8 +1806,12 @@ const startGitHubOAuth = async () => {
   // If already authorized, just fetch repos
   if (githubForm.value.secretId) {
     try {
-      const { invoke: invokeFn } = await import('@tauri-apps/api/core');
-      const repos = await invokeFn<any[]>('get_github_repositories', { secretId: githubForm.value.secretId });
+      const tauriCore = await import('@tauri-apps/api/core');
+      if (!tauriCore?.invoke) {
+        console.warn('Tauri API not available');
+        return;
+      }
+      const repos = await tauriCore.invoke<any[]>('get_github_repositories', { secretId: githubForm.value.secretId });
       githubForm.value.availableRepos = repos;
       return;
     } catch (e) {
@@ -1777,8 +1822,13 @@ const startGitHubOAuth = async () => {
   
   githubForm.value.oauthInProgress = true;
   try {
-    const { invoke } = await import('@tauri-apps/api/core');
-    const { openUrl } = await import('@tauri-apps/plugin-opener');
+    const tauriCore = await import('@tauri-apps/api/core');
+    const openerPlugin = await import('@tauri-apps/plugin-opener');
+    if (!tauriCore?.invoke || !openerPlugin?.openUrl) {
+      throw new Error('Tauri API not available. Make sure you are running in a Tauri app.');
+    }
+    const { invoke } = tauriCore;
+    const { openUrl } = openerPlugin;
     
     // Start device flow
     const deviceInfo = await invoke<any>('start_github_oauth');
@@ -2003,14 +2053,19 @@ const editSource = async (source: Source) => {
     editForm.value.endpoints = config.endpoints || ['commits', 'prs'];
     editForm.value.pollIntervalGitHub = config.poll_interval || '10m';
     // Load secret_id from backend
-    const { invoke } = await import('@tauri-apps/api/core');
+    const tauriCore = await import('@tauri-apps/api/core');
+    if (!tauriCore?.invoke) {
+      console.warn('Tauri API not available');
+      editForm.value.secretId = null;
+      return;
+    }
     try {
-      const secretId = await invoke<number | null>('get_source_secret_id', { id: source.id });
+      const secretId = await tauriCore.invoke<number | null>('get_source_secret_id', { id: source.id });
       editForm.value.secretId = secretId;
       // If we have a secret_id, try to load repos
       if (secretId) {
         try {
-          const repos = await invoke<any[]>('get_github_repositories', { secretId });
+          const repos = await tauriCore.invoke<any[]>('get_github_repositories', { secretId });
           editForm.value.availableRepos = repos;
         } catch (e) {
           console.warn('Failed to load repositories:', e);
@@ -2406,8 +2461,11 @@ const fetchSecrets = async () => {
   secretsLoading.value = true;
   secretsError.value = null;
   try {
-    const { invoke } = await import('@tauri-apps/api/core');
-    secrets.value = await invoke<any[]>('get_secrets');
+    const tauriCore = await import('@tauri-apps/api/core');
+    if (!tauriCore?.invoke) {
+      throw new Error('Tauri API not available. Make sure you are running in a Tauri app.');
+    }
+    secrets.value = await tauriCore.invoke<any[]>('get_secrets');
   } catch (e) {
     secretsError.value = e instanceof Error ? e.message : String(e);
     console.error('Failed to fetch secrets:', e);
@@ -2428,7 +2486,11 @@ const saveSecret = async () => {
   }
   
   try {
-    const { invoke } = await import('@tauri-apps/api/core');
+    const tauriCore = await import('@tauri-apps/api/core');
+    if (!tauriCore?.invoke) {
+      throw new Error('Tauri API not available. Make sure you are running in a Tauri app.');
+    }
+    const { invoke } = tauriCore;
     
     // If creating a new secret and ttlType is "forever", try to detect expiration from token
     let ttlType = secretForm.value.ttlType;
@@ -2506,15 +2568,95 @@ const removeSecret = async (id: number) => {
   
   deletingSecrets.value.add(id);
   try {
-    const { invoke } = await import('@tauri-apps/api/core');
-    await invoke('delete_secret', { id });
+    const tauriCore = await import('@tauri-apps/api/core');
+    if (!tauriCore?.invoke) {
+      throw new Error('Tauri API not available. Make sure you are running in a Tauri app.');
+    }
+    await tauriCore.invoke('delete_secret', { id });
     await fetchSecrets();
+    secretHealthStatus.value.delete(id);
   } catch (e) {
     const errorMsg = e instanceof Error ? e.message : String(e);
     alert(`Failed to delete secret: ${errorMsg}`);
     secretsError.value = errorMsg;
   } finally {
     deletingSecrets.value.delete(id);
+  }
+};
+
+// Get secret health status
+const getSecretHealthStatus = (secret: any): 'good' | 'warning' | 'error' | 'testing' => {
+  if (testingSecrets.value.has(secret.id)) {
+    return 'testing';
+  }
+  
+  // Check if we have a cached status
+  if (secretHealthStatus.value.has(secret.id)) {
+    return secretHealthStatus.value.get(secret.id)!;
+  }
+  
+  // Check refresh failure count
+  if (secret.refresh_failure_count && secret.refresh_failure_count >= 3) {
+    return 'error';
+  }
+  
+  if (secret.refresh_failure_count && secret.refresh_failure_count > 0) {
+    return 'warning';
+  }
+  
+  // Check if expired
+  if (secret.expires_at && secret.expires_at < Date.now() / 1000) {
+    return 'error';
+  }
+  
+  // Check if expiring soon (within 7 days)
+  if (secret.expires_at) {
+    const daysUntilExpiry = (secret.expires_at - Date.now() / 1000) / (24 * 60 * 60);
+    if (daysUntilExpiry > 0 && daysUntilExpiry <= 7) {
+      return 'warning';
+    }
+  }
+  
+  return 'good';
+};
+
+// Get CSS class for secret card based on health
+const getSecretHealthClass = (secret: any): string => {
+  const status = getSecretHealthStatus(secret);
+  if (status === 'error') return 'secret-card-error';
+  if (status === 'warning') return 'secret-card-warning';
+  return '';
+};
+
+// Test a secret token
+const testSecretToken = async (secretId: number) => {
+  testingSecrets.value.add(secretId);
+  secretHealthStatus.value.set(secretId, 'testing');
+  
+  try {
+    const tauriCore = await import('@tauri-apps/api/core');
+    if (!tauriCore?.invoke) {
+      throw new Error('Tauri API not available. Make sure you are running in a Tauri app.');
+    }
+    
+    const result = await tauriCore.invoke<string>('test_github_token', { secretId });
+    secretHealthStatus.value.set(secretId, 'good');
+    alert(`✓ ${result}`);
+  } catch (e) {
+    const errorMsg = e instanceof Error ? e.message : String(e);
+    secretHealthStatus.value.set(secretId, 'error');
+    
+    // Check if it's a 401/403 error
+    if (errorMsg.includes('401') || errorMsg.includes('expired') || errorMsg.includes('invalid')) {
+      alert(`❌ Token Test Failed: ${errorMsg}\n\nThis token appears to be invalid or expired. Please update it in the secret settings.`);
+    } else if (errorMsg.includes('403') || errorMsg.includes('Forbidden')) {
+      secretHealthStatus.value.set(secretId, 'warning');
+      alert(`⚠️ Token Test Warning: ${errorMsg}\n\nThe token may be missing required permissions.`);
+    } else {
+      alert(`❌ Token Test Failed: ${errorMsg}`);
+    }
+  } finally {
+    testingSecrets.value.delete(secretId);
   }
 };
 
@@ -2538,10 +2680,14 @@ const onTtlTypeChange = () => {
 // Build source -> secret mapping
 const buildSourceSecretMap = async () => {
   sourceSecretMap.value.clear();
-  const { invoke } = await import('@tauri-apps/api/core');
+  const tauriCore = await import('@tauri-apps/api/core');
+  if (!tauriCore?.invoke) {
+    console.warn('Tauri API not available, skipping secret map build');
+    return;
+  }
   for (const source of sources.value) {
     try {
-      const secretId = await invoke<number | null>('get_source_secret_id', { id: source.id });
+      const secretId = await tauriCore.invoke<number | null>('get_source_secret_id', { id: source.id });
       if (secretId !== null) {
         sourceSecretMap.value.set(source.id, secretId);
       }
@@ -2649,8 +2795,10 @@ watch(newSourceType, async (newType) => {
     // Load secrets for dropdown
     setTimeout(async () => {
       try {
-        const { invoke } = await import('@tauri-apps/api/core');
-        secrets.value = await invoke<any[]>('get_secrets');
+        const tauriCore = await import('@tauri-apps/api/core');
+        if (tauriCore?.invoke) {
+          secrets.value = await tauriCore.invoke<any[]>('get_secrets');
+        }
       } catch (e) {
         console.warn('Failed to fetch secrets:', e);
       }

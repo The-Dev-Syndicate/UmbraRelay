@@ -275,6 +275,62 @@ pub async fn test_github_notifications(secret_id: i64, app: tauri::AppHandle) ->
     }
 }
 
+/// Test a GitHub token (OAuth or PAT) by making a simple API call
+#[tauri::command]
+pub async fn test_github_token(secret_id: i64, app: tauri::AppHandle) -> Result<String, String> {
+    use std::sync::Mutex;
+    use tauri::State;
+    use reqwest::blocking::Client;
+    use std::time::Duration;
+    
+    // Get token from SecretStore
+    let token = {
+        let secret_store: State<'_, Mutex<SecretStore>> = app.state();
+        let store = secret_store.lock()
+            .map_err(|e| format!("Failed to lock secret store: {}", e))?;
+        store.get(secret_id)
+            .map_err(|e| format!("Failed to get secret: {}", e))?
+            .ok_or_else(|| format!("Secret {} not found", secret_id))?
+    };
+    
+    // Test the token by making a simple API call to /user
+    let result = tokio::task::spawn_blocking(move || {
+        let client = Client::builder()
+            .timeout(Duration::from_secs(10))
+            .build()
+            .map_err(|e| anyhow::anyhow!("Failed to create HTTP client: {}", e))?;
+        
+        let response = client
+            .get("https://api.github.com/user")
+            .header("Authorization", format!("Bearer {}", token))
+            .header("Accept", "application/vnd.github.v3+json")
+            .header("User-Agent", "UmbraRelay")
+            .send()
+            .map_err(|e| anyhow::anyhow!("Failed to send request: {}", e))?;
+        
+        match response.status().as_u16() {
+            200 => {
+                let user: serde_json::Value = response.json()
+                    .map_err(|e| anyhow::anyhow!("Failed to parse response: {}", e))?;
+                let username = user.get("login")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown");
+                Ok(format!("Token is valid! Authenticated as: {}", username))
+            }
+            401 => Err(anyhow::anyhow!("Token is invalid or expired (401 Unauthorized)")),
+            403 => Err(anyhow::anyhow!("Token is missing required permissions (403 Forbidden)")),
+            status => Err(anyhow::anyhow!("GitHub API returned status: {}", status)),
+        }
+    })
+    .await
+    .map_err(|e| format!("Task join error: {}", e))?;
+    
+    match result {
+        Ok(msg) => Ok(msg),
+        Err(e) => Err(format!("{}", e))
+    }
+}
+
 #[tauri::command]
 pub async fn sync_source(
     app: AppHandle,
