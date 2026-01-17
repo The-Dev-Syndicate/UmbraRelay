@@ -6,6 +6,8 @@
   padding: $spacing-lg;
   max-width: 1000px;
   margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .sticky-header {
@@ -38,24 +40,38 @@
 
 .settings-section {
   margin-bottom: $spacing-3xl;
+  width: 100%;
   
   .section-header {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
     align-items: center;
+    gap: $spacing-md;
     margin-bottom: $spacing-lg;
+    width: 100%;
+    box-sizing: border-box;
     
     h2 {
       margin: 0;
       font-size: $font-xl;
       font-weight: $font-semibold;
       color: var(--color-text-primary);
+      white-space: nowrap;
+      grid-column: 1;
     }
     
     .section-actions {
       display: flex;
       gap: $spacing-sm;
-      margin-top: 0;
+      flex-wrap: nowrap;
+      grid-column: 3;
+      justify-content: flex-end;
+      
+      .action-button {
+        white-space: nowrap;
+        padding: $spacing-xs $spacing-md;
+        font-size: $font-sm;
+      }
     }
   }
 }

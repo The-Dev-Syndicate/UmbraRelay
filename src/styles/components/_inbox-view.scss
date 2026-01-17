@@ -68,7 +68,9 @@
   @include liquid-glass(0.1, 12px);
   width: 36px;
   height: 36px;
-  color: var(--color-text-primary);
+  border: 1px solid rgba(173, 216, 230, 0.6);
+  background: rgba(230, 240, 255, 0.8);
+  color: #5a8de8;
   flex-shrink: 0;
   
   svg {
@@ -83,13 +85,16 @@
   }
   
   &:hover:not(:disabled) {
-    background: var(--color-bg-hover);
+    background: rgba(200, 225, 255, 0.9);
+    border-color: rgba(173, 216, 230, 0.8);
+    color: #4a7dd8;
     transform: scale(1.05);
   }
   
   &:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
+    border-color: rgba(173, 216, 230, 0.3);
   }
 }
 
@@ -107,21 +112,21 @@
   align-items: center;
   justify-content: center;
   padding: $spacing-sm $spacing-lg;
-  background: var(--color-bg-primary);
-  border: 1px solid var(--color-border);
+  background: rgba(230, 240, 255, 0.8);
+  border: 1px solid rgba(173, 216, 230, 0.6);
   border-radius: $radius-sm;
   cursor: pointer;
   transition: all $transition-base;
   flex-shrink: 0;
 
   &:hover {
-    background: var(--color-bg-hover);
-    border-color: var(--color-primary);
+    background: rgba(200, 225, 255, 0.9);
+    border-color: rgba(173, 216, 230, 0.8);
   }
 
   .search-icon {
     font-size: $font-md;
-    color: var(--color-text-primary);
+    color: #5a8de8;
   }
 }
 
@@ -200,12 +205,19 @@
 
   button {
     padding: $spacing-sm $spacing-lg;
-    border: 1px solid var(--color-border);
-    background: var(--color-bg-primary);
+    border: 1px solid rgba(173, 216, 230, 0.6);
+    background: rgba(230, 240, 255, 0.8);
     cursor: pointer;
     border-radius: $radius-sm;
-    color: var(--color-text-primary);
+    color: #5a8de8;
     transition: all $transition-base;
+    font-weight: $font-medium;
+
+    &:hover {
+      background: rgba(200, 225, 255, 0.9);
+      border-color: rgba(173, 216, 230, 0.8);
+      color: #4a7dd8;
+    }
 
     &.active {
       background: var(--color-primary);
@@ -237,8 +249,8 @@
 
 .group-filter-button {
   padding: $spacing-xs $spacing-md;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-primary);
+  border: 1px solid rgba(173, 216, 230, 0.6);
+  background: rgba(230, 240, 255, 0.8);
   border-radius: $radius-sm;
   font-size: $font-sm;
   cursor: pointer;
@@ -248,15 +260,19 @@
   min-width: 120px;
   justify-content: space-between;
   transition: all $transition-base;
-  color: var(--color-text-primary);
+  color: #5a8de8;
+  font-weight: $font-medium;
 
   &:hover {
-    border-color: var(--color-primary);
+    background: rgba(200, 225, 255, 0.9);
+    border-color: rgba(173, 216, 230, 0.8);
+    color: #4a7dd8;
   }
 
   &:focus {
     outline: none;
-    border-color: var(--color-primary);
+    border-color: rgba(173, 216, 230, 0.8);
+    box-shadow: 0 0 0 2px rgba(173, 216, 230, 0.3);
   }
 }
 

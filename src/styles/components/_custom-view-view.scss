@@ -71,21 +71,21 @@
   align-items: center;
   justify-content: center;
   padding: $spacing-sm $spacing-lg;
-  background: var(--color-bg-primary);
-  border: 1px solid var(--color-border);
+  background: rgba(230, 240, 255, 0.8);
+  border: 1px solid rgba(173, 216, 230, 0.6);
   border-radius: $radius-sm;
   cursor: pointer;
   transition: all $transition-base;
   flex-shrink: 0;
 
   &:hover {
-    background: var(--color-bg-hover);
-    border-color: var(--color-primary);
+    background: rgba(200, 225, 255, 0.9);
+    border-color: rgba(173, 216, 230, 0.8);
   }
 
   .search-icon {
     font-size: $font-md;
-    color: var(--color-text-primary);
+    color: #5a8de8;
   }
 }
 
@@ -160,5 +160,15 @@
 
 .edit-view-button {
   @include button-secondary;
+  border: 1px solid rgba(173, 216, 230, 0.6);
+  background: rgba(230, 240, 255, 0.8);
+  color: #5a8de8;
+  font-weight: $font-medium;
+  
+  &:hover:not(:disabled) {
+    background: rgba(200, 225, 255, 0.9);
+    border-color: rgba(173, 216, 230, 0.8);
+    color: #4a7dd8;
+  }
 }
 
