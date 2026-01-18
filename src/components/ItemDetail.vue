@@ -42,125 +42,156 @@
         </div>
       </div>
 
-      <!-- Source Type Header -->
-      <div v-if="isGitHubNotification" class="item-source-header notification-header">
-        <div class="source-header-icon">🔔</div>
-        <div class="source-header-content">
-          <div class="source-header-title">GitHub Notification</div>
-          <div class="source-header-subtitle">This is a notification from GitHub about activity you're subscribed to</div>
-        </div>
-      </div>
-      <div v-else-if="isGitHubEvent" class="item-source-header event-header">
-        <div class="source-header-icon">⚡</div>
-        <div class="source-header-content">
-          <div class="source-header-title">GitHub Activity</div>
-          <div class="source-header-subtitle">This is an activity event from a repository you're watching</div>
-        </div>
-      </div>
-      <div v-else-if="isGitHubItem" class="item-source-header github-header">
-        <div class="source-header-icon">📦</div>
-        <div class="source-header-content">
-          <div class="source-header-title">GitHub {{ formattedItemType }}</div>
-          <div v-if="githubRepo" class="source-header-subtitle">Repository: {{ githubRepo }}</div>
-        </div>
-      </div>
-
-      <div class="item-meta">
-        <span class="item-date">{{ formatDate(item.created_at) }}</span>
-      </div>
-
+      <!-- Title -->
       <h1 class="item-title">{{ displayTitle }}</h1>
 
-      <!-- GitHub Notification/Event Details -->
-      <div v-if="githubNotificationInfo" class="github-info-section">
-        <div class="info-card">
-          <div class="info-row">
-            <span class="info-label">Type:</span>
-            <span class="info-value">{{ githubNotificationInfo.type }}</span>
-          </div>
-          <div v-if="githubNotificationInfo.reason" class="info-row">
-            <span class="info-label">Reason:</span>
-            <span class="info-value">{{ githubNotificationInfo.reason }}</span>
-          </div>
-          <div v-if="githubRepo" class="info-row">
-            <span class="info-label">Repository:</span>
-            <a :href="`https://github.com/${githubRepo}`" target="_blank" rel="noopener noreferrer" class="info-link">{{ githubRepo }}</a>
+      <!-- Subheading -->
+      <div v-if="itemSubheading" class="item-subheading">{{ itemSubheading }}</div>
+
+      <!-- Expandable Metadata Section -->
+      <div class="metadata-section">
+        <button 
+          @click="metadataExpanded = !metadataExpanded" 
+          class="metadata-toggle"
+          :aria-expanded="metadataExpanded"
+          :aria-label="metadataExpanded ? 'Collapse metadata' : 'Expand metadata'"
+        >
+          <span class="metadata-toggle-text">Metadata</span>
+          <span class="metadata-toggle-icon">{{ metadataExpanded ? '▲' : '▼' }}</span>
+        </button>
+        <div v-if="metadataExpanded" class="metadata-content">
+          <div class="metadata-grid">
+            <!-- Source Information -->
+            <div v-if="item.source_name" class="metadata-item">
+              <span class="metadata-item-label">Source:</span>
+              <span class="metadata-item-value">{{ item.source_name }}</span>
+            </div>
+            <div v-if="item.source_group" class="metadata-item">
+              <span class="metadata-item-label">Group:</span>
+              <span class="metadata-item-value">{{ item.source_group }}</span>
+            </div>
+            <div class="metadata-item">
+              <span class="metadata-item-label">Type:</span>
+              <span class="metadata-item-value">{{ formattedItemType || item.item_type }}</span>
+            </div>
+            <div class="metadata-item">
+              <span class="metadata-item-label">State:</span>
+              <span class="metadata-item-value metadata-state" :class="`state-${item.state}`">{{ item.state }}</span>
+            </div>
+
+            <!-- Publication Info -->
+            <div class="metadata-item">
+              <span class="metadata-item-label">Published:</span>
+              <span class="metadata-item-value">{{ formatDate(item.created_at) }}</span>
+            </div>
+            <div v-if="item.updated_at && item.updated_at !== item.created_at" class="metadata-item">
+              <span class="metadata-item-label">Updated:</span>
+              <span class="metadata-item-value">{{ formatDate(item.updated_at) }}</span>
+            </div>
+
+            <!-- Author -->
+            <div v-if="item.author" class="metadata-item">
+              <span class="metadata-item-label">Author:</span>
+              <span class="metadata-item-value">{{ item.author }}</span>
+            </div>
+
+            <!-- GitHub-specific Info -->
+            <div v-if="githubNotificationInfo" class="metadata-item">
+              <span class="metadata-item-label">Notification Type:</span>
+              <span class="metadata-item-value">{{ githubNotificationInfo.type }}</span>
+            </div>
+            <div v-if="githubNotificationInfo?.reason" class="metadata-item">
+              <span class="metadata-item-label">Reason:</span>
+              <span class="metadata-item-value">{{ githubNotificationInfo.reason }}</span>
+            </div>
+            <div v-if="githubRepo" class="metadata-item">
+              <span class="metadata-item-label">Repository:</span>
+              <a :href="`https://github.com/${githubRepo}`" target="_blank" rel="noopener noreferrer" class="metadata-link">{{ githubRepo }}</a>
+            </div>
+
+            <!-- Categories -->
+            <div v-if="categories.length > 0" class="metadata-item metadata-item-full">
+              <span class="metadata-item-label">Categories:</span>
+              <div class="metadata-categories">
+                <span v-for="cat in categories" :key="cat" class="metadata-category-tag">{{ cat }}</span>
+              </div>
+            </div>
+
+            <!-- External ID (for debugging) -->
+            <div class="metadata-item">
+              <span class="metadata-item-label">ID:</span>
+              <span class="metadata-item-value metadata-id">{{ item.external_id }}</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- RSS 2.0 metadata: author, categories, comments -->
-      <div v-if="item.author || (categories.length > 0 && !isGitHubItem) || item.comments" class="item-metadata">
-        <div v-if="item.author" class="item-author">
-          <span class="metadata-label">Author:</span>
-          <span class="metadata-value">{{ item.author }}</span>
-        </div>
-        <div v-if="categories.length > 0" class="item-categories">
-          <div class="category-tags-container" :class="{ 'expanded': categoriesExpanded }">
-            <span v-for="cat in categories" :key="cat" class="category-tag">{{ cat }}</span>
-          </div>
-          <button 
-            v-if="hasCategoryOverflow" 
-            @click="categoriesExpanded = !categoriesExpanded" 
-            class="category-expand-button"
-            :aria-label="categoriesExpanded ? 'Collapse categories' : 'Expand categories'"
-          >
-            <span v-if="!categoriesExpanded">▼</span>
-            <span v-else>▲</span>
-          </button>
-        </div>
-        <div v-if="item.comments" class="item-comments">
-          <button @click="openComments" class="comments-button">
-            View Comments
-          </button>
-        </div>
-      </div>
-
+      <!-- Image (if available) -->
       <div v-if="item.image_url" class="item-image-container">
         <img :src="item.image_url" :alt="item.title" class="item-image" />
       </div>
 
-      <!-- Show description as muted preview text if we have full content -->
-      <div v-if="item.content_html && hasValidSummary" class="item-description-preview">
-        {{ cleanedSummary }}
-      </div>
-
-      <!-- Show full HTML content if available - this should render as HTML, not text -->
-      <div v-if="hasContentHtml" class="item-content-html-wrapper">
-        <div class="item-content-html" v-html="decodedContentHtml"></div>
-      </div>
-      
-      <!-- Debug: Show if content_html is expected but missing -->
-      <div v-else-if="item.image_url" class="item-content-missing">
-        <p><em>Full article content not available. This item may need to be re-synced to load the full content.</em></p>
-        <p style="margin-top: 8px; font-size: 12px; color: #999;">
-          If this feed supports full content (like Fox News), try syncing the source again.
-        </p>
-      </div>
-      
-      <!-- Fallback to summary if no content_html (show as plain text, not HTML) -->
-      <template v-else>
-        <div v-if="hasValidSummary" class="item-summary">{{ cleanedSummary }}</div>
-        <div v-else-if="item.summary" class="item-summary-raw">
-          <p><em>Summary content filtered (may contain only links or minimal text)</em></p>
-          <details>
-            <summary style="cursor: pointer; color: #666; font-size: 14px;">Show raw content</summary>
-            <pre style="margin-top: 8px; padding: 12px; background: #f5f5f5; border-radius: 4px; font-size: 12px; overflow-x: auto;">{{ item.summary }}</pre>
-          </details>
+      <!-- Formatted Content Section -->
+      <div class="item-content-formatted">
+        <!-- Show description as muted preview text if we have full content -->
+        <div v-if="item.content_html && hasValidSummary" class="item-description-preview">
+          {{ cleanedSummary }}
         </div>
-        <div v-else class="item-no-content">
-          <p><strong>No summary available in RSS feed</strong></p>
-          <p style="margin-top: 8px; font-size: 14px; color: #666;">
-            Many RSS feeds only provide titles and links. Click "Open Link" above to view the full article content on the original website.
+
+        <!-- Show full HTML content if available - this should render as HTML, not text -->
+        <div v-if="hasContentHtml" class="item-content-html-wrapper">
+          <div class="item-content-html" v-html="decodedContentHtml"></div>
+        </div>
+        
+        <!-- Debug: Show if content_html is expected but missing -->
+        <div v-else-if="item.image_url" class="item-content-missing">
+          <p><em>Full article content not available. This item may need to be re-synced to load the full content.</em></p>
+          <p style="margin-top: 8px; font-size: 12px; color: #999;">
+            If this feed supports full content (like Fox News), try syncing the source again.
           </p>
         </div>
-      </template>
+        
+        <!-- Fallback to summary if no content_html (show as plain text, not HTML) -->
+        <template v-else>
+          <div v-if="hasValidSummary" class="item-summary">{{ cleanedSummary }}</div>
+          <div v-else-if="item.summary" class="item-summary-raw">
+            <p><em>Summary content filtered (may contain only links or minimal text)</em></p>
+            <details>
+              <summary style="cursor: pointer; color: #666; font-size: 14px;">Show raw content</summary>
+              <pre style="margin-top: 8px; padding: 12px; background: #f5f5f5; border-radius: 4px; font-size: 12px; overflow-x: auto;">{{ item.summary }}</pre>
+            </details>
+          </div>
+          <div v-else class="item-no-content">
+            <p><strong>No summary available in RSS feed</strong></p>
+            <p style="margin-top: 8px; font-size: 14px; color: #666;">
+              Many RSS feeds only provide titles and links. Click "Open Link" above to view the full article content on the original website.
+            </p>
+          </div>
+        </template>
+      </div>
 
-      <!-- <div class="item-url">
-        <a :href="item.url" target="_blank" rel="noopener noreferrer">
-          {{ item.url }}
+      <!-- Footer -->
+      <div class="item-footer">
+        <a 
+          :href="item.url" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          @click.prevent="openExternal"
+          class="footer-link"
+        >
+          View Original Article
         </a>
-      </div> -->
+        <a 
+          v-if="item.comments"
+          :href="item.comments" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          @click.prevent="openComments"
+          class="footer-link"
+        >
+          View Comments
+        </a>
+      </div>
     </div>
   </div>
 </template>
@@ -188,7 +219,7 @@ const props = defineProps<{
 const item = ref<Item | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
-const categoriesExpanded = ref(false);
+const metadataExpanded = ref(false);
 
 const fetchItem = async () => {
   loading.value = true;
@@ -354,6 +385,37 @@ const displayTitle = computed(() => {
   }
   
   return item.value.title;
+});
+
+// Subheading based on source type
+const itemSubheading = computed(() => {
+  if (!item.value) return '';
+  
+  const parts: string[] = [];
+  
+  // For GitHub items, prefer repository name
+  if (isGitHubItem.value) {
+    if (githubRepo.value) {
+      parts.push(githubRepo.value);
+    } else if (item.value.source_name) {
+      parts.push(item.value.source_name);
+    }
+  } else {
+    // For RSS/Atom items
+    if (item.value.author) {
+      parts.push(item.value.author);
+    }
+    if (item.value.source_name) {
+      parts.push(item.value.source_name);
+    }
+  }
+  
+  // Add source group if available
+  if (item.value.source_group) {
+    parts.push(`(${item.value.source_group})`);
+  }
+  
+  return parts.join(' • ');
 });
 
 onMounted(() => {

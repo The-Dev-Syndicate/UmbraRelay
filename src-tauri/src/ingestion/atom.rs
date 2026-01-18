@@ -13,7 +13,7 @@ pub struct AtomIngester {
 impl AtomIngester {
     pub fn new(url: String) -> Result<Self> {
         let client = Client::builder()
-            .timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(60)) // Increased to 60 seconds for slow feeds
             .build()
             .context("Failed to create HTTP client")?;
         
@@ -68,13 +68,62 @@ impl IngestSource for AtomIngester {
         let response = self.client
             .get(&self.url)
             .send()
-            .context("Failed to fetch ATOM feed")?;
+            .with_context(|| format!("Failed to fetch ATOM feed from: {}", self.url))?;
+        
+        let status = response.status();
+        if !status.is_success() {
+            let error_msg = match status.as_u16() {
+                504 => format!(
+                    "Gateway timeout (504) when fetching ATOM feed from: {}. The server took too long to respond. This may indicate the feed URL is incorrect or the server is overloaded.",
+                    self.url
+                ),
+                404 => format!(
+                    "Feed not found (404) at: {}. Please verify the URL is correct. For GitHub user feeds, use: https://github.com/USERNAME.private.atom (with authentication) or https://github.com/USERNAME.atom (public)",
+                    self.url
+                ),
+                403 => format!(
+                    "Access forbidden (403) when fetching ATOM feed from: {}. The feed may require authentication or the server is blocking requests.",
+                    self.url
+                ),
+                _ => format!(
+                    "HTTP error {} when fetching ATOM feed from: {}",
+                    status, self.url
+                ),
+            };
+            anyhow::bail!("{}", error_msg);
+        }
         
         let content = response.text()
-            .context("Failed to read ATOM feed content")?;
+            .with_context(|| format!("Failed to read ATOM feed content from: {}", self.url))?;
+        
+        // Check if content is empty
+        if content.trim().is_empty() {
+            anyhow::bail!("ATOM feed from {} is empty", self.url);
+        }
+        
+        // Check if content looks like XML/ATOM
+        if !content.trim_start().starts_with("<?xml") && !content.trim_start().starts_with("<feed") {
+            anyhow::bail!(
+                "ATOM feed from {} does not appear to be valid XML (starts with: {})",
+                self.url,
+                content.chars().take(50).collect::<String>()
+            );
+        }
         
         let feed = Feed::read_from(content.as_bytes())
-            .context("Failed to parse ATOM feed")?;
+            .with_context(|| {
+                // Try to provide more context about the parse error
+                let preview = if content.len() > 200 {
+                    format!("{}...", &content[..200])
+                } else {
+                    content.clone()
+                };
+                format!(
+                    "Failed to parse ATOM feed from {}: Invalid XML structure. Content preview: {}",
+                    self.url,
+                    preview.replace('\n', " ").replace('\r', " ")
+                )
+            })?;
         
         let items: Vec<IngestedItem> = feed.entries()
             .iter()

@@ -14,7 +14,7 @@ pub struct RssIngester {
 impl RssIngester {
     pub fn new(url: String) -> Result<Self> {
         let client = Client::builder()
-            .timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(60)) // Increased to 60 seconds for slow feeds
             .build()
             .context("Failed to create HTTP client")?;
         
