@@ -74,6 +74,60 @@ You can temporarily disable sources without deleting them:
 - Items from disabled sources remain in your inbox
 - You can manually sync disabled sources
 
+## Article View Preferences
+
+UmbraRelay can automatically detect and fetch full article content from websites when RSS/Atom feeds only provide summaries.
+
+### Article View Modes
+
+You can configure how articles are displayed in **Settings > Article View**:
+
+#### Auto (detect & fetch full text)
+- **Default mode** - Automatically detects partial feeds
+- Fetches full articles in the background for feeds that only provide summaries
+- Shows a spinner (⏳) next to article titles while fetching
+- Displays full content when available, falls back to feed content if extraction fails
+- **Best for**: Most users who want complete articles without manual configuration
+
+#### Feed content only
+- Always displays content from the RSS/Atom feed
+- Never fetches full articles from websites
+- **Best for**: Users who prefer feed content or want to save bandwidth
+
+#### Always fetch full article
+- Always attempts to fetch and display full article content
+- Falls back to feed content if extraction fails
+- **Best for**: Users who want full articles even when feeds provide substantial content
+
+### Content Extraction
+
+- **Enable/Disable**: Toggle "Enable content extraction" in Settings
+- **When Disabled**: No articles are fetched, even in Auto mode
+- **When Enabled**: Articles are fetched automatically based on your view mode preference
+
+### Visual Indicators
+
+When viewing articles, you'll see indicators showing the content source:
+
+- **⏳ Spinner**: Article is being fetched in the background
+- **"Full Article" badge**: Content was extracted from the website
+- **"From Feed" badge**: Content is from the RSS/Atom feed
+
+### How It Works
+
+1. **Detection**: When items are synced, UmbraRelay analyzes the feed content
+2. **Classification**: Items are marked as "full", "partial", or "unknown"
+3. **Extraction**: Partial items automatically trigger background fetching
+4. **Caching**: Extracted content is cached - each article is only fetched once
+5. **Display**: The UI shows the best available content based on your preferences
+
+### Performance
+
+- Extraction happens **asynchronously** - doesn't slow down feed syncing
+- Extracted content is **cached permanently** - fast loading on subsequent views
+- **No duplicate fetches** - each article URL is only fetched once
+- Small delay between extractions to avoid overwhelming servers
+
 ## Best Practices
 
 1. **Start Small**: Begin with 1-2 sources to get familiar
@@ -81,10 +135,13 @@ You can temporarily disable sources without deleting them:
 3. **Respect APIs**: Don't poll too frequently (especially GitHub)
 4. **Descriptive Names**: Use clear, descriptive names for sources
 5. **Monitor Rate Limits**: GitHub has rate limits (5000 requests/hour for authenticated)
+6. **Article View**: Use "Auto" mode for best experience with partial feeds
 
 ## Troubleshooting
 
 - **Source Not Syncing**: Check if source is enabled
 - **Invalid Poll Interval**: Use format like `5m` or `1h`
 - **GitHub Auth Errors**: Verify token has correct scopes
+- **Articles Not Fetching**: Check that "Enable content extraction" is enabled and view mode is set to "Auto" or "Always fetch"
+- **Extraction Failures**: Some websites block automated fetching - feed content will be shown instead
 - See [Troubleshooting Guide](troubleshooting.md) for more help

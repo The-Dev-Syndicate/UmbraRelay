@@ -133,6 +133,17 @@ pub struct IngestedItem {
 - **Parse Errors**: Logged, skip invalid items
 - **Auth Errors**: Logged, source disabled (future)
 
+## Content Detection and Extraction
+
+UmbraRelay automatically detects partial feeds and can fetch full article content. See [Content Extraction](content-extraction.md) for detailed documentation.
+
+### Quick Overview
+
+- **Detection**: Analyzes feed content during ingestion to classify as "full" or "partial"
+- **Extraction**: Background task fetches full articles for partial feeds
+- **Caching**: Extracted content is cached permanently
+- **User Control**: Configurable via Settings > Article View
+
 ## Future Enhancements
 
 - **Pagination**: Handle large result sets
@@ -140,4 +151,5 @@ pub struct IngestedItem {
 - **Retry Logic**: Exponential backoff
 - **Caching**: ETag/Last-Modified headers
 - **Parallel Polling**: Poll multiple sources concurrently
+- **Batch Extraction**: Extract multiple articles in parallel
 

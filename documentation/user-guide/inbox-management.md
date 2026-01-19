@@ -23,10 +23,20 @@ Use the filter buttons at the top of the inbox:
 
 1. **Click any item** in the inbox list
 2. The detail view shows:
-   - Full title
-   - Complete summary/description
+   - Full title (with content source indicator)
+   - Complete article content (from feed or extracted)
    - External URL
    - Item metadata (type, state, date)
+
+### Content Source Indicators
+
+When viewing articles, you may see indicators showing where the content comes from:
+
+- **⏳ Spinner**: Article is being fetched in the background (full content loading)
+- **"Full Article" badge**: Content was extracted from the website
+- **"From Feed" badge**: Content is from the RSS/Atom feed
+
+Articles with partial feeds will automatically fetch full content in the background. See [Configuration](configuration.md#article-view-preferences) for more details.
 
 ## Changing Item States
 

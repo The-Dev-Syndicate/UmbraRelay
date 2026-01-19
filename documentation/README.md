@@ -19,6 +19,7 @@ Welcome to the UmbraRelay documentation. UmbraRelay is a local-first desktop inb
 - [Architecture](technical/architecture.md) - System architecture overview
 - [Database Schema](technical/database-schema.md) - SQLite database structure
 - [Ingestion System](technical/ingestion-system.md) - How RSS and GitHub ingestion works
+- [Content Extraction](technical/content-extraction.md) - Automatic full-text article extraction
 - [Normalization](technical/normalization.md) - Deduplication and normalization logic
 - [API Reference](technical/api-reference.md) - Tauri command API reference
 - [Development](technical/development.md) - Development setup and contribution guide
