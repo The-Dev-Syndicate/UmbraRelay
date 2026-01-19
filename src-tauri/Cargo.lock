@@ -5371,6 +5371,7 @@ dependencies = [
  "anyhow",
  "atom_syndication",
  "chrono",
+ "once_cell",
  "readabilityrs",
  "regex",
  "reqwest",

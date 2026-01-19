@@ -150,6 +150,7 @@ pub fn run() {
             commands::get_items,
             commands::get_item,
             commands::update_item_state,
+            commands::bulk_update_item_state,
             commands::clear_source_items,
             commands::get_sources,
             commands::get_source_secret_id,
@@ -954,95 +955,102 @@ async fn process_background_extraction(
         return Ok(());
     }
     
-    // Process each item (with small delay to avoid overwhelming servers)
-    for item_id in item_ids {
-        // Small delay between extractions
-        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-        let db_state: State<'_, Mutex<Database>> = app.state();
-        
-        // Check if item needs extraction
-        let (needs_extraction, url, completeness) = {
-            let db_guard = db_state.lock()
-                .map_err(|_| anyhow::anyhow!("Failed to lock database"))?;
+    // Process items in batches to avoid stack overflow with large datasets
+    const BATCH_SIZE: usize = 50;
+    for chunk in item_ids.chunks(BATCH_SIZE) {
+        // Process batch
+        for item_id in chunk {
+            // Small delay between extractions
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            let db_state: State<'_, Mutex<Database>> = app.state();
             
-            // Get item details
-            let item = match db_guard.get_item(item_id) {
-                Ok(item) => item,
-                Err(_) => {
-                    continue; // Item not found, skip
-                }
+            // Check if item needs extraction
+            let (needs_extraction, url, completeness) = {
+                let db_guard = db_state.lock()
+                    .map_err(|_| anyhow::anyhow!("Failed to lock database"))?;
+                
+                // Get item details
+                let item = match db_guard.get_item(*item_id) {
+                    Ok(item) => item,
+                    Err(_) => {
+                        continue; // Item not found, skip
+                    }
+                };
+                
+                let status = item.content_status.as_deref().unwrap_or("");
+                let completeness = item.content_completeness.as_deref().unwrap_or("");
+                let url = item.url;
+                
+                // Only extract if:
+                // - completeness is "partial"
+                // - status is NULL or "feed_only" (not already extracted/fetching/failed)
+                // - URL exists
+                let needs = completeness == "partial" 
+                    && (status.is_empty() || status == "feed_only")
+                    && !url.is_empty();
+                
+                drop(db_guard);
+                (needs, url, completeness.to_string())
             };
             
-            let status = item.content_status.as_deref().unwrap_or("");
-            let completeness = item.content_completeness.as_deref().unwrap_or("");
-            let url = item.url;
+            if !needs_extraction {
+                continue;
+            }
             
-            // Only extract if:
-            // - completeness is "partial"
-            // - status is NULL or "feed_only" (not already extracted/fetching/failed)
-            // - URL exists
-            let needs = completeness == "partial" 
-                && (status.is_empty() || status == "feed_only")
-                && !url.is_empty();
+            // Set status to "fetching"
+            {
+                let db_guard = db_state.lock()
+                    .map_err(|_| anyhow::anyhow!("Failed to lock database"))?;
+                db_guard.update_item_content_status(
+                    *item_id,
+                    "fetching",
+                    None,
+                    Some(&completeness),
+                    None,
+                )?;
+                drop(db_guard);
+            }
             
-            drop(db_guard);
-            (needs, url, completeness.to_string())
-        };
-        
-        if !needs_extraction {
-            continue;
-        }
-        
-        // Set status to "fetching"
-        {
+            // Extract content in blocking task
+            // Note: url comes from item.url which is the RSS <link> or Atom <link rel="alternate"> tag
+            // This is the canonical article URL, not parsed from CDATA or content_html
+            let extraction_result = tokio::task::spawn_blocking({
+                let url_clone = url.clone();
+                move || extract_full_text(&url_clone)
+            })
+            .await
+            .map_err(|e| anyhow::anyhow!("Task join error: {}", e))?;
+            
+            // Update database with result
             let db_guard = db_state.lock()
                 .map_err(|_| anyhow::anyhow!("Failed to lock database"))?;
-            db_guard.update_item_content_status(
-                item_id,
-                "fetching",
-                None,
-                Some(&completeness),
-                None,
-            )?;
-            drop(db_guard);
-        }
-        
-        // Extract content in blocking task
-        // Note: url comes from item.url which is the RSS <link> or Atom <link rel="alternate"> tag
-        // This is the canonical article URL, not parsed from CDATA or content_html
-        let extraction_result = tokio::task::spawn_blocking({
-            let url_clone = url.clone();
-            move || extract_full_text(&url_clone)
-        })
-        .await
-        .map_err(|e| anyhow::anyhow!("Task join error: {}", e))?;
-        
-        // Update database with result
-        let db_guard = db_state.lock()
-            .map_err(|_| anyhow::anyhow!("Failed to lock database"))?;
-        
-        match extraction_result {
-            Ok(result) => {
-                // Success - update with extracted content
-                db_guard.update_item_content_status(
-                    item_id,
-                    "extracted",
-                    Some(&result.content),
-                    Some(&completeness),
-                    None,
-                )?;
-            }
-            Err(e) => {
-                // Failure - update with error reason
-                db_guard.update_item_content_status(
-                    item_id,
-                    "failed",
-                    None,
-                    Some(&completeness),
-                    Some(&format!("{}", e)),
-                )?;
+            
+            match extraction_result {
+                Ok(result) => {
+                    // Success - update with extracted content
+                    db_guard.update_item_content_status(
+                        *item_id,
+                        "extracted",
+                        Some(&result.content),
+                        Some(&completeness),
+                        None,
+                    )?;
+                }
+                Err(e) => {
+                    // Failure - update with error reason
+                    db_guard.update_item_content_status(
+                        *item_id,
+                        "failed",
+                        None,
+                        Some(&completeness),
+                        Some(&format!("{}", e)),
+                    )?;
+                }
             }
         }
+        
+        // Small delay between batches to prevent stack overflow
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     }
     
     Ok(())

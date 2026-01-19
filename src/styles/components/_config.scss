@@ -283,6 +283,19 @@
 .source-info {
   font-size: $font-md;
   color: var(--color-text-secondary);
+  
+  p {
+    margin: $spacing-xs 0;
+  }
+}
+
+.source-endpoint {
+  font-size: $font-sm;
+  color: var(--color-text-muted);
+  font-family: monospace;
+  word-break: break-all;
+  margin-top: $spacing-xs;
+  opacity: 0.8;
 }
 
 .section-actions {

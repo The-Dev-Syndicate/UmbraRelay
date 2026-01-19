@@ -68,7 +68,7 @@
       </div>
       
       <div class="sources-list">
-      <div v-for="source in sources" :key="source.id" class="source-card">
+      <div v-for="source in paginatedSources" :key="source.id" class="source-card">
         <div class="source-header">
           <div>
             <h3>{{ source.name }}</h3>
@@ -115,9 +115,22 @@
             Last synced: {{ formatDate(source.last_synced_at) }}
           </p>
           <p v-else>Never synced</p>
+          <p class="source-endpoint">{{ getSourceEndpoint(source) }}</p>
         </div>
       </div>
         </div>
+      <PaginationControls
+        v-if="sources.length > 0"
+        :current-page="currentPage"
+        :total-pages="totalPages"
+        :total-items="sources.length"
+        :items-per-page="itemsPerPage"
+        :items-per-page-options="itemsPerPageOptions"
+        @go-to-page="goToPage"
+        @next-page="nextPage"
+        @previous-page="previousPage"
+        @items-per-page-change="setItemsPerPage"
+      />
 
         <!-- Groups Section -->
         <div class="settings-section">
@@ -1006,6 +1019,18 @@
           </button>
         </div>
       </div>
+      <PaginationControls
+        v-if="sources.length > 0"
+        :current-page="currentPage"
+        :total-pages="totalPages"
+        :total-items="sources.length"
+        :items-per-page="itemsPerPage"
+        :items-per-page-options="itemsPerPageOptions"
+        @go-to-page="goToPage"
+        @next-page="nextPage"
+        @previous-page="previousPage"
+        @items-per-page-change="setItemsPerPage"
+      />
     </div>
 </template>
 
@@ -1014,12 +1039,34 @@ import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import { useSources } from '../../composables/useSources';
 import { useGroups } from '../../composables/useGroups';
+import { usePagination } from '../../composables/usePagination';
+import PaginationControls from '../base/PaginationControls.vue';
 import { ask, MessageDialogOptions } from '@tauri-apps/plugin-dialog';
 import type { Source, SourceInput, UpdateSourceInput, Group } from '../../types';
 import { formatDate } from '../../utils/formatting';
 
 const { sources, loading, error, fetchSources, addSource, updateSource, removeSource: removeSourceAction, syncSource, syncAllSources } = useSources();
 const { groups, fetchGroups, addGroup, updateGroup, removeGroup: removeGroupAction } = useGroups();
+
+// Pagination for sources
+const {
+  currentPage,
+  totalPages,
+  paginatedItems: paginatedSources,
+  itemsPerPage,
+  itemsPerPageOptions,
+  goToPage,
+  nextPage,
+  previousPage,
+  resetPage,
+  setItemsPerPage,
+  checkPageBounds,
+} = usePagination(() => sources.value);
+
+// Check page bounds when sources change
+watch(() => sources.value.length, () => {
+  checkPageBounds();
+});
 
 // Article view preferences
 const articleViewMode = ref<string>('auto');
@@ -1157,6 +1204,42 @@ const getSourceGroupNames = (source: Source): string[] => {
   return source.group_ids
     .map(id => groups.value.find(g => g.id === id)?.name)
     .filter((name): name is string => name !== undefined);
+};
+
+// Get endpoint URL/description for a source
+const getSourceEndpoint = (source: Source): string => {
+  let config: Record<string, any> = {};
+  
+  // Parse config_json if it's a string
+  if (typeof source.config_json === 'string') {
+    try {
+      config = JSON.parse(source.config_json);
+    } catch (e) {
+      console.error('Failed to parse config_json:', e);
+      config = {};
+    }
+  } else {
+    config = source.config_json || {};
+  }
+  
+  // Extract endpoint based on source type
+  if (source.source_type === 'rss' || source.source_type === 'atom') {
+    return config.url || 'No URL configured';
+  } else if (source.source_type === 'github') {
+    const repos = config.repositories || [];
+    if (repos.length > 0) {
+      if (repos.length <= 3) {
+        return `Repos: ${repos.join(', ')}`;
+      } else {
+        return `Repos: ${repos.slice(0, 3).join(', ')} + ${repos.length - 3} more`;
+      }
+    }
+    return 'GitHub API';
+  } else if (source.source_type === 'github_notifications') {
+    return 'GitHub Notifications API';
+  }
+  
+  return 'Unknown endpoint';
 };
 
 // Get count of sources using a group

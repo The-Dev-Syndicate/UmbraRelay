@@ -405,6 +405,11 @@ impl Database {
         let mut string_params: Vec<String> = Vec::new();
         let mut int_params: Vec<i64> = Vec::new();
         
+        // Always exclude deleted items unless explicitly requested
+        if state_filter != Some("deleted") {
+            conditions.push("i.state != 'deleted'".to_string());
+        }
+        
         // State filter
         if let Some(state) = state_filter {
             conditions.push("i.state = ?".to_string());
@@ -446,7 +451,8 @@ impl Database {
         
         // Group by item fields to handle GROUP_CONCAT properly
         query.push_str(" GROUP BY i.id, i.source_id, i.external_id, i.title, i.summary, i.url, i.item_type, i.state, i.created_at, i.updated_at, i.image_url, i.content_html, i.author, i.category, i.comments, s.name, i.content_status, i.extracted_content_html, i.content_completeness, i.extraction_attempted_at, i.extraction_failed_reason");
-        query.push_str(" ORDER BY i.created_at DESC");
+        // Order by created_at DESC (newest first), then by id DESC for consistent ordering when timestamps are identical
+        query.push_str(" ORDER BY i.created_at DESC, i.id DESC");
         
         // Build params vector with proper references
         let mut stmt = conn.prepare(&query)?;
@@ -546,6 +552,32 @@ impl Database {
             params![state, now, id],
         )?;
         Ok(())
+    }
+
+    /// Updates multiple items' state in a single transaction
+    pub fn bulk_update_item_state(&self, ids: &[i64], state: &str) -> Result<usize> {
+        let conn = self.conn.lock().unwrap();
+        let now = Utc::now().timestamp();
+        
+        if ids.is_empty() {
+            return Ok(0);
+        }
+        
+        // Build placeholders for the IN clause
+        let placeholders: Vec<String> = (1..=ids.len()).map(|_| "?".to_string()).collect();
+        let query = format!(
+            "UPDATE items SET state = ?, updated_at = ? WHERE id IN ({})",
+            placeholders.join(", ")
+        );
+        
+        // Build params: state, updated_at, then all IDs
+        let mut params: Vec<&dyn rusqlite::ToSql> = vec![&state, &now];
+        for id in ids {
+            params.push(id);
+        }
+        
+        let updated = conn.execute(&query, rusqlite::params_from_iter(params.iter()))?;
+        Ok(updated)
     }
 
 
