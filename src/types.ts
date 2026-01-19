@@ -16,6 +16,12 @@ export interface Item {
   comments?: string | null;
   source_name?: string | null;
   source_group?: string | null;
+  // Content extraction fields
+  content_status?: string | null; // 'feed_only', 'fetching', 'extracted', 'failed', 'skipped'
+  extracted_content_html?: string | null;
+  content_completeness?: string | null; // 'full', 'partial', 'unknown'
+  extraction_attempted_at?: number | null;
+  extraction_failed_reason?: string | null;
 }
 
 export interface CustomView {

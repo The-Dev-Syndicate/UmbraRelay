@@ -306,6 +306,81 @@
       </div>
     </div>
 
+    <!-- Article View Preferences Section -->
+    <div class="settings-section">
+      <div class="section-header">
+        <h2>Article View</h2>
+      </div>
+      
+      <div class="theme-selector-section">
+        <label class="theme-selector-label">Article View Mode</label>
+        <div class="theme-options">
+          <label 
+            class="theme-option"
+            :class="{ active: articleViewMode === 'auto' }"
+          >
+            <input 
+              type="radio" 
+              value="auto" 
+              :checked="articleViewMode === 'auto'"
+              @change="handleArticleViewModeChange('auto')"
+            />
+            <span class="theme-name">Auto (detect & fetch full text)</span>
+            <div style="font-size: 12px; color: var(--color-text-secondary); margin-top: 4px;">
+              Automatically detect partial feeds and fetch full articles in the background
+            </div>
+          </label>
+          <label 
+            class="theme-option"
+            :class="{ active: articleViewMode === 'feed_only' }"
+          >
+            <input 
+              type="radio" 
+              value="feed_only" 
+              :checked="articleViewMode === 'feed_only'"
+              @change="handleArticleViewModeChange('feed_only')"
+            />
+            <span class="theme-name">Feed content only</span>
+            <div style="font-size: 12px; color: var(--color-text-secondary); margin-top: 4px;">
+              Always show content from the feed, never fetch full articles
+            </div>
+          </label>
+          <label 
+            class="theme-option"
+            :class="{ active: articleViewMode === 'always_fetch' }"
+          >
+            <input 
+              type="radio" 
+              value="always_fetch" 
+              :checked="articleViewMode === 'always_fetch'"
+              @change="handleArticleViewModeChange('always_fetch')"
+            />
+            <span class="theme-name">Always fetch full article</span>
+            <div style="font-size: 12px; color: var(--color-text-secondary); margin-top: 4px;">
+              Always attempt to fetch and display full article content
+            </div>
+          </label>
+        </div>
+        <p class="theme-description">
+          Control how articles are displayed. Auto mode detects partial feeds and fetches full content automatically.
+        </p>
+      </div>
+
+      <div class="theme-selector-section" style="margin-top: $spacing-lg;">
+        <label class="theme-selector-label">
+          <input 
+            type="checkbox" 
+            :checked="extractionEnabled"
+            @change="handleExtractionEnabledChange"
+          />
+          Enable content extraction
+        </label>
+        <p class="theme-description">
+          When enabled, UmbraRelay can fetch full article content from websites. Disable to save bandwidth and improve performance.
+        </p>
+      </div>
+    </div>
+
     <!-- Add Source Modal -->
     <div v-if="showAddSourceModal" class="edit-panel-overlay" @click="closeAddSourceModal">
       <div class="edit-panel" @click.stop>
@@ -1218,6 +1293,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
+import { invoke } from '@tauri-apps/api/core';
 import { useSources } from '../composables/useSources';
 import { useGroups } from '../composables/useGroups';
 import { useTheme } from '../composables/useTheme';
@@ -1228,6 +1304,44 @@ import { formatDate } from '../utils/formatting';
 const { sources, loading, error, fetchSources, addSource, updateSource, removeSource: removeSourceAction, syncSource, syncAllSources } = useSources();
 const { groups, fetchGroups, addGroup, updateGroup, removeGroup: removeGroupAction } = useGroups();
 const { currentTheme, systemPreference, setTheme } = useTheme();
+
+// Article view preferences
+const articleViewMode = ref<string>('auto');
+const extractionEnabled = ref<boolean>(true);
+
+const loadArticlePreferences = async () => {
+  try {
+    const mode = await invoke<string | null>('get_user_preference', { key: 'article_view_mode' });
+    articleViewMode.value = mode || 'auto';
+    
+    const enabled = await invoke<string | null>('get_user_preference', { key: 'extraction_enabled' });
+    extractionEnabled.value = enabled !== 'false';
+  } catch (error) {
+    console.error('Failed to load article preferences:', error);
+  }
+};
+
+const handleArticleViewModeChange = async (mode: 'auto' | 'feed_only' | 'always_fetch') => {
+  try {
+    await invoke('set_user_preference', { key: 'article_view_mode', value: mode });
+    articleViewMode.value = mode;
+  } catch (error) {
+    console.error('Failed to change article view mode:', error);
+    alert('Failed to change article view mode. Please try again.');
+  }
+};
+
+const handleExtractionEnabledChange = async (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const enabled = target.checked;
+  try {
+    await invoke('set_user_preference', { key: 'extraction_enabled', value: enabled ? 'true' : 'false' });
+    extractionEnabled.value = enabled;
+  } catch (error) {
+    console.error('Failed to change extraction enabled:', error);
+    alert('Failed to change extraction setting. Please try again.');
+  }
+};
 
 const syncingSources = ref<Set<number>>(new Set());
 const deletingSources = ref<Set<number>>(new Set());
@@ -2839,6 +2953,7 @@ onMounted(async () => {
   await fetchSourcesAndRebuildMap();
   await fetchGroups();
   await fetchSecrets();
+  await loadArticlePreferences();
   isComponentMounted = true;
   // Check for existing GitHub auth if GitHub form is already selected
   // Use setTimeout to ensure component is fully mounted
