@@ -68,7 +68,7 @@
       </div>
       
       <div class="sources-list">
-      <div v-for="source in sources" :key="source.id" class="source-card">
+      <div v-for="source in paginatedSources" :key="source.id" class="source-card">
         <div class="source-header">
           <div>
             <h3>{{ source.name }}</h3>
@@ -119,6 +119,18 @@
         </div>
       </div>
         </div>
+      <PaginationControls
+        v-if="sources.length > 0"
+        :current-page="currentPage"
+        :total-pages="totalPages"
+        :total-items="sources.length"
+        :items-per-page="itemsPerPage"
+        :items-per-page-options="itemsPerPageOptions"
+        @go-to-page="goToPage"
+        @next-page="nextPage"
+        @previous-page="previousPage"
+        @items-per-page-change="setItemsPerPage"
+      />
 
         <!-- Groups Section -->
         <div class="settings-section">
@@ -1007,6 +1019,18 @@
           </button>
         </div>
       </div>
+      <PaginationControls
+        v-if="sources.length > 0"
+        :current-page="currentPage"
+        :total-pages="totalPages"
+        :total-items="sources.length"
+        :items-per-page="itemsPerPage"
+        :items-per-page-options="itemsPerPageOptions"
+        @go-to-page="goToPage"
+        @next-page="nextPage"
+        @previous-page="previousPage"
+        @items-per-page-change="setItemsPerPage"
+      />
     </div>
 </template>
 
@@ -1015,12 +1039,34 @@ import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import { useSources } from '../../composables/useSources';
 import { useGroups } from '../../composables/useGroups';
+import { usePagination } from '../../composables/usePagination';
+import PaginationControls from '../base/PaginationControls.vue';
 import { ask, MessageDialogOptions } from '@tauri-apps/plugin-dialog';
 import type { Source, SourceInput, UpdateSourceInput, Group } from '../../types';
 import { formatDate } from '../../utils/formatting';
 
 const { sources, loading, error, fetchSources, addSource, updateSource, removeSource: removeSourceAction, syncSource, syncAllSources } = useSources();
 const { groups, fetchGroups, addGroup, updateGroup, removeGroup: removeGroupAction } = useGroups();
+
+// Pagination for sources
+const {
+  currentPage,
+  totalPages,
+  paginatedItems: paginatedSources,
+  itemsPerPage,
+  itemsPerPageOptions,
+  goToPage,
+  nextPage,
+  previousPage,
+  resetPage,
+  setItemsPerPage,
+  checkPageBounds,
+} = usePagination(() => sources.value);
+
+// Check page bounds when sources change
+watch(() => sources.value.length, () => {
+  checkPageBounds();
+});
 
 // Article view preferences
 const articleViewMode = ref<string>('auto');

@@ -46,7 +46,7 @@
     </div>
     <div v-else class="items-list">
       <div
-        v-for="item in filteredItems"
+        v-for="item in paginatedItems"
         :key="item.id"
         class="item-card"
         :class="[item.state, { selected: selectedItems.has(item.id) }]"
@@ -97,12 +97,26 @@
         </div>
       </div>
     </div>
+    <PaginationControls
+      v-if="filteredItems.length > 0"
+      :current-page="currentPage"
+      :total-pages="totalPages"
+      :total-items="filteredItems.length"
+      :items-per-page="itemsPerPage"
+      :items-per-page-options="itemsPerPageOptions"
+      @go-to-page="goToPage"
+      @next-page="nextPage"
+      @previous-page="previousPage"
+      @items-per-page-change="setItemsPerPage"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useItems } from '../../composables/useItems';
+import { usePagination } from '../../composables/usePagination';
+import PaginationControls from '../base/PaginationControls.vue';
 import type { Item } from '../../types';
 import { formatDate, truncate, stripHtml, parseGroups } from '../../utils/formatting';
 
@@ -142,6 +156,26 @@ const filteredItems = computed(() => {
       // Sort by oldest first (reverse date order)
       return a.created_at - b.created_at;
     });
+});
+
+// Pagination
+const {
+  currentPage,
+  totalPages,
+  paginatedItems,
+  itemsPerPage,
+  itemsPerPageOptions,
+  goToPage,
+  nextPage,
+  previousPage,
+  resetPage,
+  setItemsPerPage,
+  checkPageBounds,
+} = usePagination(() => filteredItems.value);
+
+// Check page bounds when filtered items change
+watch(() => filteredItems.value.length, () => {
+  checkPageBounds();
 });
 
 const selectItem = async (id: number) => {

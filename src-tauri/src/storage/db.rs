@@ -451,7 +451,8 @@ impl Database {
         
         // Group by item fields to handle GROUP_CONCAT properly
         query.push_str(" GROUP BY i.id, i.source_id, i.external_id, i.title, i.summary, i.url, i.item_type, i.state, i.created_at, i.updated_at, i.image_url, i.content_html, i.author, i.category, i.comments, s.name, i.content_status, i.extracted_content_html, i.content_completeness, i.extraction_attempted_at, i.extraction_failed_reason");
-        query.push_str(" ORDER BY i.created_at DESC");
+        // Order by created_at DESC (newest first), then by id DESC for consistent ordering when timestamps are identical
+        query.push_str(" ORDER BY i.created_at DESC, i.id DESC");
         
         // Build params vector with proper references
         let mut stmt = conn.prepare(&query)?;
