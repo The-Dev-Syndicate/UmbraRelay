@@ -61,9 +61,9 @@
 
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
-import { useItems } from '../composables/useItems';
-import type { Item } from '../types';
-import { formatDate, truncate, stripHtml, parseGroups } from '../utils/formatting';
+import { useItems } from '../../composables/useItems';
+import type { Item } from '../../types';
+import { formatDate, truncate, stripHtml, parseGroups } from '../../utils/formatting';
 
 const emit = defineEmits<{
   (e: 'select-item', id: number): void;

@@ -123,6 +123,9 @@ pub fn run() {
                 // Wait a moment for the app to fully initialize
                 tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
                 
+                // Proactively refresh GitHub tokens before syncing
+                refresh_github_tokens_on_startup(&app_handle_sync).await;
+                
                 // Get all enabled sources and sync them
                 let sources = match get_sources_sync(&app_handle_sync) {
                     Ok(sources) => sources.into_iter().filter(|s| s.enabled).collect::<Vec<_>>(),
@@ -168,6 +171,8 @@ pub fn run() {
             commands::remove_group,
             commands::get_user_preference,
             commands::set_user_preference,
+            commands::trigger_extraction,
+            commands::get_item_with_content,
             commands::get_secrets,
             commands::get_secret,
             commands::create_secret,
@@ -765,12 +770,62 @@ pub async fn sync_source_internal(app: &tauri::AppHandle, source: storage::model
                     .ok_or_else(|| anyhow::anyhow!("Secret not found in secure storage"))?
             };
             
-            tokio::task::spawn_blocking(move || {
-                let ingester = GitHubNotificationsIngester::new(token)?;
-                ingester.poll()
+            let secret_id_clone = secret_id;
+            let app_clone = app.clone();
+            
+            // First attempt with current token
+            let result = tokio::task::spawn_blocking({
+                let token_clone = token.clone();
+                move || {
+                    let ingester = GitHubNotificationsIngester::new(token_clone)?;
+                    ingester.poll()
+                }
             })
             .await
-            .map_err(|e| anyhow::anyhow!("Task join error: {}", e))?
+            .map_err(|e| anyhow::anyhow!("Task join error: {}", e))?;
+            
+            // Check if we got a 401 error and try to refresh
+            match result {
+                Ok(items) => Ok(items),
+                Err(e) => {
+                    let error_msg = e.to_string();
+                    if error_msg.contains("401") {
+                        // Attempt to refresh token
+                        match crate::commands::refresh_github_token_internal(&app_clone, secret_id_clone).await {
+                            Ok(new_token) => {
+                                // Retry with new token
+                                tokio::task::spawn_blocking(move || {
+                                    let ingester = GitHubNotificationsIngester::new(new_token)?;
+                                    ingester.poll()
+                                })
+                                .await
+                                .map_err(|e| anyhow::anyhow!("Task join error: {}", e))?
+                            }
+                            Err(_) => {
+                                // Increment failure count
+                                let db_state: tauri::State<'_, std::sync::Mutex<Database>> = app_clone.state();
+                                let db_guard = db_state.lock()
+                                    .map_err(|_| anyhow::anyhow!("Failed to lock database"))?;
+                                let failure_count = db_guard.increment_refresh_failure_count(secret_id_clone)
+                                    .map_err(|e| anyhow::anyhow!("Failed to increment failure count: {}", e))?;
+                                drop(db_guard);
+                                
+                                // If 3 or more failures, expire and disable
+                                if failure_count >= 3 {
+                                    let _ = crate::commands::expire_secret_internal(&app_clone, secret_id_clone);
+                                    return Err(anyhow::anyhow!("Token refresh failed 3 times. Please re-authorize in source settings."));
+                                }
+                                
+                                // Return original error
+                                Err(e)
+                            }
+                        }
+                    } else {
+                        // Not a 401 error, return original error
+                        Err(e)
+                    }
+                }
+            }
         }
         _ => return Err(anyhow::anyhow!("Unknown source type: {}", source.source_type)),
     }?;
@@ -780,10 +835,215 @@ pub async fn sync_source_internal(app: &tauri::AppHandle, source: storage::model
     let db_guard = db_state.lock()
         .map_err(|_| anyhow::anyhow!("Failed to lock database"))?;
     
-    normalize_and_dedupe(&db_guard, source.id, items)?;
+    let item_ids = normalize_and_dedupe(&db_guard, source.id, items)?;
     
     // Update sync time
     db_guard.update_source_sync_time(source.id)?;
+    drop(db_guard);
+    
+    // Spawn background extraction task for items that need it
+    let app_clone = app.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = process_background_extraction(&app_clone, item_ids).await {
+            eprintln!("Background extraction error: {}", e);
+        }
+    });
+    
+    Ok(())
+}
+
+/// Proactively refreshes GitHub tokens on startup to prevent 401 errors
+async fn refresh_github_tokens_on_startup(app: &tauri::AppHandle) {
+    use std::sync::Mutex;
+    use tauri::State;
+    
+    // Get all sources
+    let sources = match get_sources_sync(app) {
+        Ok(sources) => sources,
+        Err(e) => {
+            eprintln!("Failed to get sources for token refresh: {}", e);
+            return;
+        }
+    };
+    
+    // Find all GitHub sources with secrets
+    for source in sources {
+        if source.source_type != "github" && source.source_type != "github_notifications" {
+            continue;
+        }
+        
+        let secret_id = {
+            let db_state: State<'_, Mutex<Database>> = app.state();
+            let db_guard = match db_state.lock() {
+                Ok(db) => db,
+                Err(_) => continue,
+            };
+            match db_guard.get_source_secret_id(source.id) {
+                Ok(Some(id)) => id,
+                Ok(None) => continue,
+                Err(_) => continue,
+            }
+        };
+        
+        // Check if secret has refresh token capability
+        let has_refresh_token = {
+            let db_state: State<'_, Mutex<Database>> = app.state();
+            let db_guard = match db_state.lock() {
+                Ok(db) => db,
+                Err(_) => continue,
+            };
+            match db_guard.get_secret(secret_id) {
+                Ok(secret) => secret.refresh_token_id.is_some(),
+                Err(_) => false,
+            }
+        };
+        
+        if has_refresh_token {
+            // Try to refresh token proactively
+            match crate::commands::refresh_github_token_internal(app, secret_id).await {
+                Ok(_) => {
+                    eprintln!("Successfully refreshed GitHub token for source: {}", source.name);
+                }
+                Err(e) => {
+                    eprintln!("Failed to refresh GitHub token for source {}: {} (will retry on sync)", source.name, e);
+                }
+            }
+        }
+    }
+}
+
+/// Background task that extracts full content for items marked as partial
+async fn process_background_extraction(
+    app: &tauri::AppHandle,
+    item_ids: Vec<i64>,
+) -> anyhow::Result<()> {
+    use std::sync::Mutex;
+    use tauri::State;
+    use crate::ingestion::extraction::extract_full_text;
+    
+    // Check user preference for extraction
+    let extraction_enabled = {
+        let db_state: State<'_, Mutex<Database>> = app.state();
+        let db_guard = db_state.lock()
+            .map_err(|_| anyhow::anyhow!("Failed to lock database"))?;
+        let enabled = db_guard.get_user_preference("extraction_enabled")
+            .unwrap_or(None)
+            .unwrap_or_else(|| "true".to_string());
+        drop(db_guard);
+        enabled == "true"
+    };
+    
+    if !extraction_enabled {
+        return Ok(()); // Extraction disabled by user
+    }
+    
+    // Get article view mode preference
+    let view_mode = {
+        let db_state: State<'_, Mutex<Database>> = app.state();
+        let db_guard = db_state.lock()
+            .map_err(|_| anyhow::anyhow!("Failed to lock database"))?;
+        let mode = db_guard.get_user_preference("article_view_mode")
+            .unwrap_or(None)
+            .unwrap_or_else(|| "auto".to_string());
+        drop(db_guard);
+        mode
+    };
+    
+    // Only extract if mode is "auto" or "always_fetch"
+    if view_mode != "auto" && view_mode != "always_fetch" {
+        return Ok(());
+    }
+    
+    // Process each item (with small delay to avoid overwhelming servers)
+    for item_id in item_ids {
+        // Small delay between extractions
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        let db_state: State<'_, Mutex<Database>> = app.state();
+        
+        // Check if item needs extraction
+        let (needs_extraction, url, completeness) = {
+            let db_guard = db_state.lock()
+                .map_err(|_| anyhow::anyhow!("Failed to lock database"))?;
+            
+            // Get item details
+            let item = match db_guard.get_item(item_id) {
+                Ok(item) => item,
+                Err(_) => {
+                    continue; // Item not found, skip
+                }
+            };
+            
+            let status = item.content_status.as_deref().unwrap_or("");
+            let completeness = item.content_completeness.as_deref().unwrap_or("");
+            let url = item.url;
+            
+            // Only extract if:
+            // - completeness is "partial"
+            // - status is NULL or "feed_only" (not already extracted/fetching/failed)
+            // - URL exists
+            let needs = completeness == "partial" 
+                && (status.is_empty() || status == "feed_only")
+                && !url.is_empty();
+            
+            drop(db_guard);
+            (needs, url, completeness.to_string())
+        };
+        
+        if !needs_extraction {
+            continue;
+        }
+        
+        // Set status to "fetching"
+        {
+            let db_guard = db_state.lock()
+                .map_err(|_| anyhow::anyhow!("Failed to lock database"))?;
+            db_guard.update_item_content_status(
+                item_id,
+                "fetching",
+                None,
+                Some(&completeness),
+                None,
+            )?;
+            drop(db_guard);
+        }
+        
+        // Extract content in blocking task
+        // Note: url comes from item.url which is the RSS <link> or Atom <link rel="alternate"> tag
+        // This is the canonical article URL, not parsed from CDATA or content_html
+        let extraction_result = tokio::task::spawn_blocking({
+            let url_clone = url.clone();
+            move || extract_full_text(&url_clone)
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!("Task join error: {}", e))?;
+        
+        // Update database with result
+        let db_guard = db_state.lock()
+            .map_err(|_| anyhow::anyhow!("Failed to lock database"))?;
+        
+        match extraction_result {
+            Ok(result) => {
+                // Success - update with extracted content
+                db_guard.update_item_content_status(
+                    item_id,
+                    "extracted",
+                    Some(&result.content),
+                    Some(&completeness),
+                    None,
+                )?;
+            }
+            Err(e) => {
+                // Failure - update with error reason
+                db_guard.update_item_content_status(
+                    item_id,
+                    "failed",
+                    None,
+                    Some(&completeness),
+                    Some(&format!("{}", e)),
+                )?;
+            }
+        }
+    }
     
     Ok(())
 }

@@ -1,20 +1,56 @@
 <template>
-  <div class="source-config">
-    <!-- Sticky Header -->
-    <div class="sticky-header">
-      <div class="header-left">
-        <h1>Settings</h1>
-      </div>
-    </div>
-
+  <div>
     <div v-if="loading" class="loading">Loading sources and groups...</div>
     <div v-if="error" class="error-message">
       Error: {{ error }}
       <button @click="error = null" class="dismiss-error">×</button>
     </div>
 
-    <!-- Sources Section -->
-    <div class="settings-section">
+        <!-- Article View Preferences Section -->
+        <div class="settings-section">
+          <div class="section-header">
+            <h2>Article View</h2>
+          </div>
+          
+          <div class="form-group">
+            <label>Article View Mode</label>
+            <select 
+              :value="articleViewMode" 
+              @change="handleArticleViewModeChange"
+              class="form-select"
+            >
+              <option value="auto">Auto (detect & fetch full text)</option>
+              <option value="feed_only">Feed content only</option>
+              <option value="always_fetch">Always fetch full article</option>
+            </select>
+            <p class="theme-description">
+              Control how articles are displayed. Auto mode detects partial feeds and fetches full content automatically.
+            </p>
+            <p class="theme-description">
+            * Auto mode detects partial feeds and fetches full content automatically.</p>
+            <p class="theme-description"> 
+              * Feed content only mode always displays content from the RSS/Atom feed.</p>
+            <p class="theme-description"> 
+              * Always fetch full article mode always attempts to fetch and display full article content.</p>
+          </div>
+
+          <div class="theme-selector-section" style="margin-top: 24px;">
+            <label class="theme-selector-label">
+              <input 
+                type="checkbox" 
+                :checked="extractionEnabled"
+                @change="handleExtractionEnabledChange"
+              />
+              Enable content extraction
+            </label>
+            <p class="theme-description">
+              When enabled, UmbraRelay can fetch full article content from websites. Disable to save bandwidth and improve performance.
+            </p>
+          </div>
+        </div>
+
+        <!-- Sources Section -->
+        <div class="settings-section">
       <div class="section-header">
         <h2>Sources</h2>
         <div class="section-actions">
@@ -81,95 +117,10 @@
           <p v-else>Never synced</p>
         </div>
       </div>
-    </div>
-    </div>
-
-    <!-- Secrets Section -->
-    <div class="settings-section">
-      <div class="section-header">
-        <h2>Security & Secrets</h2>
-        <div class="section-actions">
-          <button @click="showAddSecretModal = true" class="action-button primary">
-            + Add Secret
-          </button>
         </div>
-      </div>
-      
-      <div v-if="secretsLoading" class="loading">Loading secrets...</div>
-      <div v-if="secretsError" class="error-message">
-        Error: {{ secretsError }}
-        <button @click="secretsError = null" class="dismiss-error">×</button>
-      </div>
-      
-      <div v-if="!secretsLoading && secrets.length === 0" class="empty-state">
-        <p>No secrets yet. Create your first secret to store API tokens.</p>
-      </div>
-      
-      <div v-else-if="!secretsLoading" class="secrets-list">
-        <div v-for="secret in secrets" :key="secret.id" class="secret-card" :class="getSecretHealthClass(secret)">
-          <div class="secret-header">
-            <div>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <h3>{{ secret.name }}</h3>
-                <span v-if="getSecretHealthStatus(secret) === 'error'" class="token-status-badge error" title="Token has issues">
-                  ⚠️ Token Issues
-                </span>
-                <span v-else-if="getSecretHealthStatus(secret) === 'warning'" class="token-status-badge warning" title="Token may have issues">
-                  ⚠️ Warning
-                </span>
-                <span v-else-if="getSecretHealthStatus(secret) === 'testing'" class="token-status-badge testing" title="Testing token...">
-                  🔄 Testing...
-                </span>
-                <span v-else-if="getSecretHealthStatus(secret) === 'good'" class="token-status-badge good" title="Token is valid">
-                  ✓ Valid
-                </span>
-              </div>
-              <div class="secret-meta">
-                <span class="ttl-type">{{ secret.ttl_type }}</span>
-                <span v-if="secret.expires_at" class="expiry-info">
-                  Expires: {{ formatDate(secret.expires_at) }}
-                </span>
-                <span v-else class="expiry-info">Never expires</span>
-                <span class="secret-count">
-                  {{ getSecretSourceCount(secret.id) }} source{{ getSecretSourceCount(secret.id) !== 1 ? 's' : '' }}
-                </span>
-                <span v-if="secret.refresh_failure_count && secret.refresh_failure_count > 0" class="failure-count" style="color: #d32f2f; font-weight: 500;">
-                  ({{ secret.refresh_failure_count }} refresh failure{{ secret.refresh_failure_count !== 1 ? 's' : '' }})
-                </span>
-              </div>
-            </div>
-            <div class="secret-actions">
-              <button 
-                @click="testSecretToken(secret.id)" 
-                class="icon-button"
-                :disabled="testingSecrets.has(secret.id)"
-                :title="testingSecrets.has(secret.id) ? 'Testing...' : 'Test Token'"
-              >
-                {{ testingSecrets.has(secret.id) ? '🔄' : '🧪' }}
-              </button>
-              <button 
-                @click="editSecret(secret)" 
-                class="icon-button"
-                title="Edit"
-              >
-                ✏️
-              </button>
-              <button 
-                @click="removeSecret(secret.id)" 
-                class="icon-button delete"
-                :disabled="deletingSecrets.has(secret.id)"
-                title="Delete"
-              >
-                🗑️
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
 
-    <!-- Groups Section -->
-    <div class="settings-section">
+        <!-- Groups Section -->
+        <div class="settings-section">
       <div class="section-header">
         <h2>Groups</h2>
         <div class="section-actions">
@@ -208,105 +159,10 @@
             </button>
           </div>
         </div>
+        </div>
+        </div>
       </div>
-    </div>
-
-    <!-- Theme Section -->
-    <div class="settings-section">
-      <div class="section-header">
-        <h2>Appearance</h2>
-      </div>
-      
-      <div class="theme-selector-section">
-      <label class="theme-selector-label">Theme</label>
-      <div class="theme-options">
-        <label 
-          class="theme-option"
-          :class="{ active: currentTheme === 'system' }"
-        >
-          <input 
-            type="radio" 
-            value="system" 
-            :checked="currentTheme === 'system'"
-            @change="handleThemeChange('system')"
-          />
-          <span class="theme-name">System</span>
-          <span class="theme-preview">
-            <span class="theme-swatch" style="background: #ffffff; border-color: #000000;"></span>
-            <span class="theme-swatch" style="background: #1a1a1a; border-color: #ffffff;"></span>
-            <span class="system-indicator" v-if="currentTheme === 'system'">
-              ({{ systemPreference === 'dark' ? 'Dark' : 'Light' }})
-            </span>
-          </span>
-        </label>
-        <label 
-          class="theme-option"
-          :class="{ active: currentTheme === 'light' }"
-        >
-          <input 
-            type="radio" 
-            value="light" 
-            :checked="currentTheme === 'light'"
-            @change="handleThemeChange('light')"
-          />
-          <span class="theme-name">Light</span>
-          <span class="theme-preview">
-            <span class="theme-swatch" style="background: #ffffff;"></span>
-          </span>
-        </label>
-        <label 
-          class="theme-option"
-          :class="{ active: currentTheme === 'dark' }"
-        >
-          <input 
-            type="radio" 
-            value="dark" 
-            :checked="currentTheme === 'dark'"
-            @change="handleThemeChange('dark')"
-          />
-          <span class="theme-name">Dark</span>
-          <span class="theme-preview">
-            <span class="theme-swatch" style="background: #1a1a1a;"></span>
-          </span>
-        </label>
-        <label 
-          class="theme-option"
-          :class="{ active: currentTheme === 'blue' }"
-        >
-          <input 
-            type="radio" 
-            value="blue" 
-            :checked="currentTheme === 'blue'"
-            @change="handleThemeChange('blue')"
-          />
-          <span class="theme-name">Blue</span>
-          <span class="theme-preview">
-            <span class="theme-swatch" style="background: #2196f3;"></span>
-          </span>
-        </label>
-        <label 
-          class="theme-option"
-          :class="{ active: currentTheme === 'liquid-glass' }"
-        >
-          <input 
-            type="radio" 
-            value="liquid-glass" 
-            :checked="currentTheme === 'liquid-glass'"
-            @change="handleThemeChange('liquid-glass')"
-          />
-          <span class="theme-name">Liquid Glass</span>
-          <span class="theme-preview">
-            <span class="theme-swatch" style="background: linear-gradient(135deg, rgba(255,255,255,0.7), rgba(255,255,255,0.3)); border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(10px);"></span>
-          </span>
-        </label>
-      </div>
-        <p class="theme-description">
-          Choose how UmbraRelay looks. System follows your OS preference.
-        </p>
-      </div>
-    </div>
-
-    <!-- Add Source Modal -->
+<!-- Add Source Modal -->
     <div v-if="showAddSourceModal" class="edit-panel-overlay" @click="closeAddSourceModal">
       <div class="edit-panel" @click.stop>
         <div class="edit-panel-header">
@@ -666,6 +522,7 @@
         </div>
       </div>
     </div>
+    </div>
 
     <!-- Edit Source Panel -->
     <div v-if="editingSource" class="edit-panel-overlay" @click="closeEditPanel">
@@ -708,7 +565,7 @@
                 <p v-if="groups.length === 0" class="no-groups-hint">
                   No groups available. Create a group in the Group Management section.
                 </p>
-                </div>
+              </div>
               <div style="margin-top: 12px;">
                 <label style="font-size: 14px; color: #666; margin-bottom: 4px; display: block;">Create New Groups</label>
                 <input 
@@ -761,7 +618,7 @@
             </div>
             <div class="form-group">
               <label>URL</label>
-              <input v-model="editForm.url" type="url" required placeholder="https://example.com/feed.xml" />
+              <input v-model="editForm.url" type="url" required placeholder="https://example.com/atom.xml" />
             </div>
             <div class="form-group">
               <label>Poll Interval (optional)</label>
@@ -785,7 +642,7 @@
                 <p v-if="groups.length === 0" class="no-groups-hint">
                   No groups available. Create a group in the Group Management section.
                 </p>
-                </div>
+              </div>
               <div style="margin-top: 12px;">
                 <label style="font-size: 14px; color: #666; margin-bottom: 4px; display: block;">Create New Groups</label>
                 <input 
@@ -989,7 +846,7 @@
                 <p v-if="groups.length === 0" class="no-groups-hint">
                   No groups available. Create a group in the Group Management section.
                 </p>
-                </div>
+              </div>
               <div style="margin-top: 12px;">
                 <label style="font-size: 14px; color: #666; margin-bottom: 4px; display: block;">Create New Groups</label>
                 <input 
@@ -1031,69 +888,6 @@
             <div class="form-actions">
               <button type="button" @click="closeEditPanel" class="cancel-button">Cancel</button>
               <button type="submit" @click.prevent="saveEdit" class="submit-button">Save Changes</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-
-    <!-- Add/Edit Secret Modal -->
-    <div v-if="showAddSecretModal || editingSecret" class="edit-panel-overlay" @click="closeSecretModal">
-      <div class="edit-panel" @click.stop>
-        <div class="edit-panel-header">
-          <h2>{{ editingSecret ? 'Edit Secret' : 'Add Secret' }}</h2>
-          <button @click="closeSecretModal" class="close-button" title="Close">×</button>
-        </div>
-        
-        <div class="edit-panel-content">
-          <form @submit.prevent="saveSecret" class="source-form" novalidate>
-            <div class="form-group">
-              <label>Name</label>
-              <input v-model="secretForm.name" type="text" required placeholder="e.g., GitHub Token" />
-            </div>
-            <div class="form-group">
-              <label>Value</label>
-              <input 
-                v-model="secretForm.value" 
-                type="password" 
-                :required="!editingSecret"
-                placeholder="Enter secret value"
-              />
-              <small v-if="editingSecret" class="hint">Leave blank to keep existing value</small>
-              <small v-if="!editingSecret" class="hint">
-                For GitHub tokens, expiration will be automatically detected if possible.
-              </small>
-            </div>
-            <div class="form-group">
-              <label>Expiry Type</label>
-              <select v-model="secretForm.ttlType" @change="onTtlTypeChange">
-                <option value="forever">Forever (No expiration)</option>
-                <option value="relative">Relative (e.g., 30 days)</option>
-                <option value="absolute">Absolute Date</option>
-              </select>
-              <small class="hint">If "Forever" is selected, we'll try to detect expiration from the token.</small>
-            </div>
-            <div v-if="secretForm.ttlType === 'relative'" class="form-group">
-              <label>Duration</label>
-              <input 
-                v-model="secretForm.ttlValue" 
-                type="text" 
-                placeholder="e.g., 30d, 1w, 6M, 1y"
-              />
-              <small class="hint">Format: number + unit (s, m, h, d, w, M, y)</small>
-            </div>
-            <div v-if="secretForm.ttlType === 'absolute'" class="form-group">
-              <label>Expiry Date</label>
-              <input 
-                v-model="secretForm.ttlValue" 
-                type="datetime-local"
-              />
-            </div>
-            <div class="form-actions">
-              <button type="button" @click="closeSecretModal" class="cancel-button">Cancel</button>
-              <button type="submit" class="submit-button">
-                {{ editingSecret ? 'Save Changes' : 'Create Secret' }}
-              </button>
             </div>
           </form>
         </div>
@@ -1213,21 +1007,65 @@
         </div>
       </div>
     </div>
-  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
-import { useSources } from '../composables/useSources';
-import { useGroups } from '../composables/useGroups';
-import { useTheme } from '../composables/useTheme';
+import { invoke } from '@tauri-apps/api/core';
+import { useSources } from '../../composables/useSources';
+import { useGroups } from '../../composables/useGroups';
 import { ask, MessageDialogOptions } from '@tauri-apps/plugin-dialog';
-import type { Source, SourceInput, UpdateSourceInput, Group } from '../types';
-import { formatDate } from '../utils/formatting';
+import type { Source, SourceInput, UpdateSourceInput, Group } from '../../types';
+import { formatDate } from '../../utils/formatting';
 
 const { sources, loading, error, fetchSources, addSource, updateSource, removeSource: removeSourceAction, syncSource, syncAllSources } = useSources();
 const { groups, fetchGroups, addGroup, updateGroup, removeGroup: removeGroupAction } = useGroups();
-const { currentTheme, systemPreference, setTheme } = useTheme();
+
+// Article view preferences
+const articleViewMode = ref<string>('auto');
+const extractionEnabled = ref<boolean>(true);
+
+const loadArticlePreferences = async () => {
+  try {
+    const mode = await invoke<string | null>('get_user_preference', { key: 'article_view_mode' });
+    articleViewMode.value = mode || 'auto';
+    
+    const enabled = await invoke<string | null>('get_user_preference', { key: 'extraction_enabled' });
+    extractionEnabled.value = enabled !== 'false';
+  } catch (error) {
+    console.error('Failed to load article preferences:', error);
+  }
+};
+
+const handleArticleViewModeChange = async (event: Event | 'auto' | 'feed_only' | 'always_fetch') => {
+  let mode: 'auto' | 'feed_only' | 'always_fetch';
+  if (typeof event === 'string') {
+    mode = event;
+  } else {
+    const target = event.target as HTMLSelectElement;
+    mode = target.value as 'auto' | 'feed_only' | 'always_fetch';
+  }
+  
+  try {
+    await invoke('set_user_preference', { key: 'article_view_mode', value: mode });
+    articleViewMode.value = mode;
+  } catch (error) {
+    console.error('Failed to change article view mode:', error);
+    alert('Failed to change article view mode. Please try again.');
+  }
+};
+
+const handleExtractionEnabledChange = async (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const enabled = target.checked;
+  try {
+    await invoke('set_user_preference', { key: 'extraction_enabled', value: enabled ? 'true' : 'false' });
+    extractionEnabled.value = enabled;
+  } catch (error) {
+    console.error('Failed to change extraction enabled:', error);
+    alert('Failed to change extraction setting. Please try again.');
+  }
+};
 
 const syncingSources = ref<Set<number>>(new Set());
 const deletingSources = ref<Set<number>>(new Set());
@@ -1239,21 +1077,7 @@ const savingGroup = ref(false);
 const savingSource = ref(false);
 const addingSource = ref(false);
 const secrets = ref<any[]>([]);
-const secretsLoading = ref(false);
-const secretsError = ref<string | null>(null);
-const showAddSecretModal = ref(false);
-const editingSecret = ref<any | null>(null);
-const deletingSecrets = ref<Set<number>>(new Set());
-const testingSecrets = ref<Set<number>>(new Set());
-const secretHealthStatus = ref<Map<number, 'good' | 'warning' | 'error' | 'testing'>>(new Map());
 const sourceSecretMap = ref<Map<number, number>>(new Map()); // Maps source_id -> secret_id
-
-const secretForm = ref({
-  name: '',
-  value: '',
-  ttlType: 'forever' as 'forever' | 'relative' | 'absolute',
-  ttlValue: '',
-});
 
 const newSourceType = ref<'rss' | 'atom' | 'github' | 'github_notifications'>('rss');
 
@@ -1338,17 +1162,6 @@ const getSourceGroupNames = (source: Source): string[] => {
 // Get count of sources using a group
 const getGroupSourceCount = (groupId: number): number => {
   return sources.value.filter(s => s.group_ids?.includes(groupId)).length;
-};
-
-// Get count of sources using a secret
-const getSecretSourceCount = (secretId: number): number => {
-  let count = 0;
-  for (const [, mappedSecretId] of sourceSecretMap.value.entries()) {
-    if (mappedSecretId === secretId) {
-      count++;
-    }
-  }
-  return count;
 };
 
 
@@ -2485,226 +2298,7 @@ const removeNewGroup = (formType: 'edit' | 'group', index: number) => {
   form.newGroups.splice(index, 1);
 };
 
-// Secrets management functions
-const fetchSecrets = async () => {
-  secretsLoading.value = true;
-  secretsError.value = null;
-  try {
-    const tauriCore = await import('@tauri-apps/api/core');
-    if (!tauriCore?.invoke) {
-      throw new Error('Tauri API not available. Make sure you are running in a Tauri app.');
-    }
-    secrets.value = await tauriCore.invoke<any[]>('get_secrets');
-  } catch (e) {
-    secretsError.value = e instanceof Error ? e.message : String(e);
-    console.error('Failed to fetch secrets:', e);
-  } finally {
-    secretsLoading.value = false;
-  }
-};
 
-const saveSecret = async () => {
-  if (!secretForm.value.name.trim()) {
-    alert('Please enter a secret name');
-    return;
-  }
-  
-  if (!editingSecret.value && !secretForm.value.value.trim()) {
-    alert('Please enter a secret value');
-    return;
-  }
-  
-  try {
-    const tauriCore = await import('@tauri-apps/api/core');
-    if (!tauriCore?.invoke) {
-      throw new Error('Tauri API not available. Make sure you are running in a Tauri app.');
-    }
-    const { invoke } = tauriCore;
-    
-    // If creating a new secret and ttlType is "forever", try to detect expiration from token
-    let ttlType = secretForm.value.ttlType;
-    let ttlValue = secretForm.value.ttlValue || undefined;
-    
-    if (!editingSecret.value && ttlType === 'forever' && secretForm.value.value.trim()) {
-      // Try to detect expiration from GitHub token
-      try {
-        const detected = await invoke<{ ttl_type: string; ttl_value?: string } | null>('detect_github_token_expiration', {
-          token: secretForm.value.value
-        });
-        if (detected) {
-          ttlType = detected.ttl_type as 'forever' | 'relative' | 'absolute';
-          ttlValue = detected.ttl_value;
-        }
-      } catch (e) {
-        // If detection fails, continue with "forever"
-        console.warn('Failed to detect token expiration:', e);
-      }
-    }
-    
-    if (editingSecret.value) {
-      await invoke('update_secret', {
-        id: editingSecret.value.id,
-        name: secretForm.value.name,
-        value: secretForm.value.value || undefined,
-        ttl_type: ttlType,
-        ttl_value: ttlValue,
-      });
-    } else {
-      await invoke('create_secret', {
-        name: secretForm.value.name,
-        value: secretForm.value.value,
-        ttl_type: ttlType,
-        ttl_value: ttlValue,
-        refresh_token: null,
-      });
-    }
-    
-    await fetchSecrets();
-    closeSecretModal();
-  } catch (e) {
-    const errorMsg = e instanceof Error ? e.message : String(e);
-    alert(`Failed to save secret: ${errorMsg}`);
-    secretsError.value = errorMsg;
-  }
-};
-
-const editSecret = (secret: any) => {
-  editingSecret.value = secret;
-  secretForm.value = {
-    name: secret.name,
-    value: '', // Don't show existing value
-    ttlType: secret.ttl_type as 'forever' | 'relative' | 'absolute',
-    ttlValue: secret.ttl_value || '',
-  };
-};
-
-const removeSecret = async (id: number) => {
-  const secret = secrets.value.find(s => s.id === id);
-  if (!secret) return;
-  
-  const sourceCount = getSecretSourceCount(id);
-  const confirmed = await ask(
-    `Are you sure you want to delete the secret "${secret.name}"?${sourceCount > 0 ? ` This secret is used by ${sourceCount} source${sourceCount !== 1 ? 's' : ''}.` : ''}`,
-    {
-      title: 'Delete Secret',
-      kind: 'warning',
-      okLabel: 'Confirm',
-      cancelLabel: 'Cancel',
-    } as MessageDialogOptions
-  );
-  
-  if (!confirmed) return;
-  
-  deletingSecrets.value.add(id);
-  try {
-    const tauriCore = await import('@tauri-apps/api/core');
-    if (!tauriCore?.invoke) {
-      throw new Error('Tauri API not available. Make sure you are running in a Tauri app.');
-    }
-    await tauriCore.invoke('delete_secret', { id });
-    await fetchSecrets();
-    secretHealthStatus.value.delete(id);
-  } catch (e) {
-    const errorMsg = e instanceof Error ? e.message : String(e);
-    alert(`Failed to delete secret: ${errorMsg}`);
-    secretsError.value = errorMsg;
-  } finally {
-    deletingSecrets.value.delete(id);
-  }
-};
-
-// Get secret health status
-const getSecretHealthStatus = (secret: any): 'good' | 'warning' | 'error' | 'testing' => {
-  if (testingSecrets.value.has(secret.id)) {
-    return 'testing';
-  }
-  
-  // Check if we have a cached status
-  if (secretHealthStatus.value.has(secret.id)) {
-    return secretHealthStatus.value.get(secret.id)!;
-  }
-  
-  // Check refresh failure count
-  if (secret.refresh_failure_count && secret.refresh_failure_count >= 3) {
-    return 'error';
-  }
-  
-  if (secret.refresh_failure_count && secret.refresh_failure_count > 0) {
-    return 'warning';
-  }
-  
-  // Check if expired
-  if (secret.expires_at && secret.expires_at < Date.now() / 1000) {
-    return 'error';
-  }
-  
-  // Check if expiring soon (within 7 days)
-  if (secret.expires_at) {
-    const daysUntilExpiry = (secret.expires_at - Date.now() / 1000) / (24 * 60 * 60);
-    if (daysUntilExpiry > 0 && daysUntilExpiry <= 7) {
-      return 'warning';
-    }
-  }
-  
-  return 'good';
-};
-
-// Get CSS class for secret card based on health
-const getSecretHealthClass = (secret: any): string => {
-  const status = getSecretHealthStatus(secret);
-  if (status === 'error') return 'secret-card-error';
-  if (status === 'warning') return 'secret-card-warning';
-  return '';
-};
-
-// Test a secret token
-const testSecretToken = async (secretId: number) => {
-  testingSecrets.value.add(secretId);
-  secretHealthStatus.value.set(secretId, 'testing');
-  
-  try {
-    const tauriCore = await import('@tauri-apps/api/core');
-    if (!tauriCore?.invoke) {
-      throw new Error('Tauri API not available. Make sure you are running in a Tauri app.');
-    }
-    
-    const result = await tauriCore.invoke<string>('test_github_token', { secretId });
-    secretHealthStatus.value.set(secretId, 'good');
-    alert(`✓ ${result}`);
-  } catch (e) {
-    const errorMsg = e instanceof Error ? e.message : String(e);
-    secretHealthStatus.value.set(secretId, 'error');
-    
-    // Check if it's a 401/403 error
-    if (errorMsg.includes('401') || errorMsg.includes('expired') || errorMsg.includes('invalid')) {
-      alert(`❌ Token Test Failed: ${errorMsg}\n\nThis token appears to be invalid or expired. Please update it in the secret settings.`);
-    } else if (errorMsg.includes('403') || errorMsg.includes('Forbidden')) {
-      secretHealthStatus.value.set(secretId, 'warning');
-      alert(`⚠️ Token Test Warning: ${errorMsg}\n\nThe token may be missing required permissions.`);
-    } else {
-      alert(`❌ Token Test Failed: ${errorMsg}`);
-    }
-  } finally {
-    testingSecrets.value.delete(secretId);
-  }
-};
-
-const closeSecretModal = () => {
-  showAddSecretModal.value = false;
-  editingSecret.value = null;
-  secretForm.value = {
-    name: '',
-    value: '',
-    ttlType: 'forever',
-    ttlValue: '',
-  };
-};
-
-const onTtlTypeChange = () => {
-  if (secretForm.value.ttlType === 'forever') {
-    secretForm.value.ttlValue = '';
-  }
-};
 
 // Build source -> secret mapping
 const buildSourceSecretMap = async () => {
@@ -2733,14 +2327,6 @@ const fetchSourcesAndRebuildMap = async () => {
   await buildSourceSecretMap();
 };
 
-const handleThemeChange = async (theme: 'system' | 'light' | 'dark' | 'blue' | 'liquid-glass') => {
-  try {
-    await setTheme(theme);
-  } catch (error) {
-    console.error('Failed to change theme:', error);
-    alert('Failed to change theme. Please try again.');
-  }
-};
 
 const copyGitHubCode = async () => {
   const code = githubAuthCode.value;
@@ -2838,7 +2424,7 @@ watch(newSourceType, async (newType) => {
 onMounted(async () => {
   await fetchSourcesAndRebuildMap();
   await fetchGroups();
-  await fetchSecrets();
+  await loadArticlePreferences();
   isComponentMounted = true;
   // Check for existing GitHub auth if GitHub form is already selected
   // Use setTimeout to ensure component is fully mounted
@@ -2880,8 +2466,3 @@ defineExpose({
   }
 });
 </script>
-
-<style scoped>
-/* Styles moved to src/styles/components/_source-config.scss */
-</style>
-

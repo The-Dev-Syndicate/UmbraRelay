@@ -120,16 +120,45 @@ impl Database {
                 CREATE INDEX IF NOT EXISTS idx_sources_secret_id ON sources(secret_id);
                 "#
             ),
+            M::up(
+                r#"
+                -- Add content extraction columns to items table
+                -- Note: These will fail silently if columns already exist (handled below)
+                ALTER TABLE items ADD COLUMN content_status TEXT;
+                ALTER TABLE items ADD COLUMN extracted_content_html TEXT;
+                ALTER TABLE items ADD COLUMN content_completeness TEXT;
+                ALTER TABLE items ADD COLUMN extraction_attempted_at INTEGER;
+                ALTER TABLE items ADD COLUMN extraction_failed_reason TEXT;
+                
+                -- Index for content_status to speed up queries
+                CREATE INDEX IF NOT EXISTS idx_items_content_status ON items(content_status);
+                "#
+            ),
         ]);
 
         // Try to run migrations, but handle the case where database is already at a higher version
         match migrations.to_latest(&mut conn) {
             Ok(_) => {},
             Err(e) => {
-                // If error is "DatabaseTooFarAhead", the database is already migrated
-                // Check if schema is correct and update version if needed
                 let error_str = format!("{}", e);
-                if error_str.contains("DatabaseTooFarAhead") {
+                
+                // Check if error is about column already existing
+                if error_str.contains("duplicate column") || error_str.contains("already exists") {
+                    // Columns already exist, migration partially applied - this is OK
+                    // Just ensure indexes exist
+                    let _ = conn.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_items_content_status ON items(content_status)",
+                        [],
+                    );
+                    // Update migration version to 2 since columns already exist
+                    let _ = conn.execute(
+                        "UPDATE schema_migrations SET version = 2 WHERE version < 2",
+                        [],
+                    );
+                    // Continue - migration is effectively done, columns will be ensured below
+                } else if error_str.contains("DatabaseTooFarAhead") {
+                    // If error is "DatabaseTooFarAhead", the database is already migrated
+                    // Check if schema is correct and update version if needed
                     // Verify schema is correct by checking for key tables
                     let schema_ok = conn.query_row(
                         "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('sources', 'items', 'secrets', 'groups')",
@@ -138,9 +167,9 @@ impl Database {
                     ).unwrap_or(false);
                     
                     if schema_ok {
-                        // Schema is correct, just update the version to 1 (our consolidated migration)
+                        // Schema is correct, just update the version to match our migrations (we have 2 migrations now)
                         let _ = conn.execute(
-                            "UPDATE schema_migrations SET version = 1",
+                            "UPDATE schema_migrations SET version = 2",
                             [],
                         );
                     } else {
@@ -163,9 +192,48 @@ impl Database {
         // Migrate existing groups from comma-separated strings to groups table
         let _ = Self::migrate_existing_groups(&conn);
 
+        // Ensure content extraction columns exist (for databases created before migration 2)
+        Self::ensure_content_extraction_columns(&conn);
+
         Ok(Database {
             conn: Arc::new(Mutex::new(conn)),
         })
+    }
+
+    /// Ensures content extraction columns exist in items table
+    /// This handles cases where the database was created before migration 2
+    fn ensure_content_extraction_columns(conn: &Connection) {
+        // Check if columns exist by querying pragma_table_info
+        let columns: Vec<String> = conn
+            .prepare("SELECT name FROM pragma_table_info('items')")
+            .and_then(|mut stmt| {
+                stmt.query_map([], |row| row.get::<_, String>(0))
+                    .and_then(|iter| iter.collect::<Result<Vec<_>, _>>())
+            })
+            .unwrap_or_default();
+
+        // Add columns that don't exist
+        if !columns.iter().any(|c| c == "content_status") {
+            let _ = conn.execute("ALTER TABLE items ADD COLUMN content_status TEXT", []);
+        }
+        if !columns.iter().any(|c| c == "extracted_content_html") {
+            let _ = conn.execute("ALTER TABLE items ADD COLUMN extracted_content_html TEXT", []);
+        }
+        if !columns.iter().any(|c| c == "content_completeness") {
+            let _ = conn.execute("ALTER TABLE items ADD COLUMN content_completeness TEXT", []);
+        }
+        if !columns.iter().any(|c| c == "extraction_attempted_at") {
+            let _ = conn.execute("ALTER TABLE items ADD COLUMN extraction_attempted_at INTEGER", []);
+        }
+        if !columns.iter().any(|c| c == "extraction_failed_reason") {
+            let _ = conn.execute("ALTER TABLE items ADD COLUMN extraction_failed_reason TEXT", []);
+        }
+
+        // Ensure index exists
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_items_content_status ON items(content_status)",
+            [],
+        );
     }
 
 
@@ -291,6 +359,7 @@ impl Database {
         category: Option<&str>,
         comments: Option<&str>,
         thread_id: Option<&str>,
+        content_completeness: Option<&str>,
     ) -> Result<i64> {
         let conn = self.conn.lock().unwrap();
         let now = Utc::now().timestamp();
@@ -304,18 +373,18 @@ impl Database {
 
         match existing {
             Ok(id) => {
-                // Update existing item
+                // Update existing item - preserve content_status if already set
                 conn.execute(
-                    "UPDATE items SET title = ?1, summary = ?2, url = ?3, item_type = ?4, image_url = ?5, content_html = ?6, author = ?7, category = ?8, comments = ?9, thread_id = ?10, updated_at = ?11 WHERE id = ?12",
-                    params![title, summary, url, item_type, image_url, content_html, author, category, comments, thread_id, now, id],
+                    "UPDATE items SET title = ?1, summary = ?2, url = ?3, item_type = ?4, image_url = ?5, content_html = ?6, author = ?7, category = ?8, comments = ?9, thread_id = ?10, content_completeness = COALESCE(?11, content_completeness), updated_at = ?12 WHERE id = ?13",
+                    params![title, summary, url, item_type, image_url, content_html, author, category, comments, thread_id, content_completeness, now, id],
                 )?;
                 Ok(id)
             }
             Err(_) => {
                 // Insert new item
                 conn.execute(
-                    "INSERT INTO items (source_id, external_id, title, summary, url, item_type, image_url, content_html, author, category, comments, thread_id, state, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 'unread', ?13, ?13)",
-                    params![source_id, external_id, title, summary, url, item_type, image_url, content_html, author, category, comments, thread_id, now],
+                    "INSERT INTO items (source_id, external_id, title, summary, url, item_type, image_url, content_html, author, category, comments, thread_id, content_completeness, state, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, 'unread', ?14, ?14)",
+                    params![source_id, external_id, title, summary, url, item_type, image_url, content_html, author, category, comments, thread_id, content_completeness, now],
                 )?;
                 Ok(conn.last_insert_rowid())
             }
@@ -329,7 +398,7 @@ impl Database {
         
         // JOIN with sources and groups tables to get group names
         // Use LEFT JOIN for groups since a source might not have any groups
-        let mut query = "SELECT i.id, i.source_id, i.external_id, i.title, i.summary, i.url, i.item_type, i.state, i.created_at, i.updated_at, i.image_url, i.content_html, i.author, i.category, i.comments, s.name as source_name, GROUP_CONCAT(g.name, ', ') as source_group FROM items i INNER JOIN sources s ON i.source_id = s.id LEFT JOIN source_groups sg ON s.id = sg.source_id LEFT JOIN groups g ON sg.group_id = g.id".to_string();
+        let mut query = "SELECT i.id, i.source_id, i.external_id, i.title, i.summary, i.url, i.item_type, i.state, i.created_at, i.updated_at, i.image_url, i.content_html, i.author, i.category, i.comments, s.name as source_name, GROUP_CONCAT(g.name, ', ') as source_group, i.content_status, i.extracted_content_html, i.content_completeness, i.extraction_attempted_at, i.extraction_failed_reason FROM items i INNER JOIN sources s ON i.source_id = s.id LEFT JOIN source_groups sg ON s.id = sg.source_id LEFT JOIN groups g ON sg.group_id = g.id".to_string();
         let mut conditions: Vec<String> = Vec::new();
         
         // Build params in order - need to store owned values for string parameters
@@ -376,7 +445,7 @@ impl Database {
         }
         
         // Group by item fields to handle GROUP_CONCAT properly
-        query.push_str(" GROUP BY i.id, i.source_id, i.external_id, i.title, i.summary, i.url, i.item_type, i.state, i.created_at, i.updated_at, i.image_url, i.content_html, i.author, i.category, i.comments, s.name");
+        query.push_str(" GROUP BY i.id, i.source_id, i.external_id, i.title, i.summary, i.url, i.item_type, i.state, i.created_at, i.updated_at, i.image_url, i.content_html, i.author, i.category, i.comments, s.name, i.content_status, i.extracted_content_html, i.content_completeness, i.extraction_attempted_at, i.extraction_failed_reason");
         query.push_str(" ORDER BY i.created_at DESC");
         
         // Build params vector with proper references
@@ -424,7 +493,7 @@ impl Database {
     pub fn get_item(&self, id: i64) -> Result<Item> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, source_id, external_id, title, summary, url, item_type, state, created_at, updated_at, image_url, content_html, author, category, comments FROM items WHERE id = ?1"
+            "SELECT id, source_id, external_id, title, summary, url, item_type, state, created_at, updated_at, image_url, content_html, author, category, comments, content_status, extracted_content_html, content_completeness, extraction_attempted_at, extraction_failed_reason FROM items WHERE id = ?1"
         )?;
         stmt.query_row(params![id], |row| Item::from_row(row))
     }
@@ -934,6 +1003,67 @@ impl Database {
             params![key, value],
         )?;
         Ok(())
+    }
+
+    // Content extraction methods
+    /// Updates item content status and extracted content
+    pub fn update_item_content_status(
+        &self,
+        item_id: i64,
+        status: &str,
+        extracted_content: Option<&str>,
+        completeness: Option<&str>,
+        failed_reason: Option<&str>,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let now = Utc::now().timestamp();
+        
+        conn.execute(
+            "UPDATE items SET content_status = ?1, extracted_content_html = ?2, content_completeness = ?3, extraction_attempted_at = ?4, extraction_failed_reason = ?5, updated_at = ?6 WHERE id = ?7",
+            params![status, extracted_content, completeness, now, failed_reason, now, item_id],
+        )?;
+        Ok(())
+    }
+
+    /// Gets item extraction status
+    #[allow(dead_code)] // Reserved for future use or debugging
+    pub fn get_item_extraction_status(&self, item_id: i64) -> Result<Option<String>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT content_status FROM items WHERE id = ?1")?;
+        let mut rows = stmt.query_map(params![item_id], |row| {
+            Ok(row.get::<_, Option<String>>(0)?)
+        })?;
+        
+        if let Some(row) = rows.next() {
+            Ok(row?)
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Updates item with content completeness detection result
+    #[allow(dead_code)] // Reserved for future use
+    pub fn update_item_completeness(&self, item_id: i64, completeness: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let now = Utc::now().timestamp();
+        
+        conn.execute(
+            "UPDATE items SET content_completeness = ?1, updated_at = ?2 WHERE id = ?3",
+            params![completeness, now, item_id],
+        )?;
+        Ok(())
+    }
+
+    /// Gets items that need extraction (partial content, not yet extracted)
+    #[allow(dead_code)] // Reserved for future batch extraction feature
+    pub fn get_items_needing_extraction(&self, limit: i64) -> Result<Vec<i64>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id FROM items WHERE content_completeness = 'partial' AND (content_status IS NULL OR content_status = 'feed_only') AND url IS NOT NULL AND url != '' LIMIT ?1"
+        )?;
+        let item_ids = stmt.query_map(params![limit], |row| row.get::<_, i64>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(item_ids)
     }
 
 }

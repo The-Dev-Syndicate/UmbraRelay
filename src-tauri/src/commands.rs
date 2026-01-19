@@ -522,6 +522,90 @@ pub async fn set_user_preference(
         .map_err(|e| format!("Failed to set user preference: {}", e))
 }
 
+/// Manually trigger extraction for a specific item
+#[tauri::command]
+pub async fn trigger_extraction(
+    app: AppHandle,
+    db: State<'_, Mutex<Database>>,
+    item_id: i64,
+) -> Result<(), String> {
+    use crate::ingestion::extraction::extract_full_text;
+    
+    // Get item to extract
+    let (url, completeness) = {
+        let db_guard = db.lock().map_err(|e| format!("Database lock error: {}", e))?;
+        let item = db_guard.get_item(item_id)
+            .map_err(|e| format!("Failed to get item: {}", e))?;
+        let completeness = item.content_completeness.unwrap_or_else(|| "unknown".to_string());
+        (item.url, completeness)
+    };
+    
+    if url.is_empty() {
+        return Err("Item has no URL to extract".to_string());
+    }
+    
+    // Set status to fetching
+    {
+        let db_guard = db.lock().map_err(|e| format!("Database lock error: {}", e))?;
+        db_guard.update_item_content_status(
+            item_id,
+            "fetching",
+            None,
+            Some(&completeness),
+            None,
+        ).map_err(|e| format!("Failed to update status: {}", e))?;
+    }
+    
+    // Extract in background
+    let app_clone = app.clone();
+    let url_clone = url.clone();
+    let completeness_clone = completeness.clone();
+    tauri::async_runtime::spawn(async move {
+        let extraction_result = tokio::task::spawn_blocking(move || {
+            extract_full_text(&url_clone)
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!("Task join error: {}", e));
+        
+        let db_state: State<'_, Mutex<Database>> = app_clone.state();
+        let db_guard = db_state.lock().unwrap();
+        
+        match extraction_result {
+            Ok(Ok(result)) => {
+                let _ = db_guard.update_item_content_status(
+                    item_id,
+                    "extracted",
+                    Some(&result.content),
+                    Some(&completeness_clone),
+                    None,
+                );
+            }
+            Ok(Err(e)) | Err(e) => {
+                let _ = db_guard.update_item_content_status(
+                    item_id,
+                    "failed",
+                    None,
+                    Some(&completeness_clone),
+                    Some(&format!("{}", e)),
+                );
+            }
+        }
+    });
+    
+    Ok(())
+}
+
+/// Gets item with resolved content based on user preferences
+#[tauri::command]
+pub async fn get_item_with_content(
+    db: State<'_, Mutex<Database>>,
+    item_id: i64,
+) -> Result<Item, String> {
+    let db_guard = db.lock().map_err(|e| format!("Database lock error: {}", e))?;
+    db_guard.get_item(item_id)
+        .map_err(|e| format!("Failed to get item: {}", e))
+}
+
 // Secret management commands
 #[tauri::command]
 pub async fn get_secrets(

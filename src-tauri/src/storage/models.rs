@@ -39,6 +39,17 @@ pub struct Item {
     pub source_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_group: Option<String>,
+    // Content extraction fields
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content_status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extracted_content_html: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content_completeness: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extraction_attempted_at: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extraction_failed_reason: Option<String>,
 }
 
 impl Source {
@@ -76,6 +87,11 @@ impl Item {
             comments: row.get(14).ok(),
             source_name: None,
             source_group: None,
+            content_status: row.get(15).ok(),
+            extracted_content_html: row.get(16).ok(),
+            content_completeness: row.get(17).ok(),
+            extraction_attempted_at: row.get(18).ok(),
+            extraction_failed_reason: row.get(19).ok(),
         })
     }
     
@@ -98,6 +114,11 @@ impl Item {
             comments: row.get(14).ok(),
             source_name: row.get(15).ok(),
             source_group: row.get(16).ok(),
+            content_status: row.get(17).ok(),
+            extracted_content_html: row.get(18).ok(),
+            content_completeness: row.get(19).ok(),
+            extraction_attempted_at: row.get(20).ok(),
+            extraction_failed_reason: row.get(21).ok(),
         })
     }
 }

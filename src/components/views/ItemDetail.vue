@@ -43,7 +43,30 @@
       </div>
 
       <!-- Title -->
-      <h1 class="item-title">{{ displayTitle }}</h1>
+      <h1 class="item-title">
+        {{ displayTitle }}
+        <span 
+          v-if="contentResolution.isFetching" 
+          class="extraction-spinner" 
+          title="Fetching Full Content"
+        >
+          ⏳
+        </span>
+        <span 
+          v-if="contentResolution.source === 'extracted'" 
+          class="content-source-badge extracted"
+          title="Full article content extracted"
+        >
+          Full Article
+        </span>
+        <span 
+          v-else-if="contentResolution.source === 'feed' && item.content_html"
+          class="content-source-badge"
+          title="Content from feed"
+        >
+          From Feed
+        </span>
+      </h1>
 
       <!-- Subheading -->
       <div v-if="itemSubheading" class="item-subheading">{{ itemSubheading }}</div>
@@ -133,41 +156,27 @@
 
       <!-- Formatted Content Section -->
       <div class="item-content-formatted">
-        <!-- Show description as muted preview text if we have full content -->
-        <div v-if="item.content_html && hasValidSummary" class="item-description-preview">
-          {{ cleanedSummary }}
-        </div>
-
-        <!-- Show full HTML content if available - this should render as HTML, not text -->
-        <div v-if="hasContentHtml" class="item-content-html-wrapper">
-          <div class="item-content-html" v-html="decodedContentHtml"></div>
-        </div>
-        
-        <!-- Debug: Show if content_html is expected but missing -->
-        <div v-else-if="item.image_url" class="item-content-missing">
-          <p><em>Full article content not available. This item may need to be re-synced to load the full content.</em></p>
-          <p style="margin-top: 8px; font-size: 12px; color: #999;">
-            If this feed supports full content (like Fox News), try syncing the source again.
+        <!-- Error message if extraction failed -->
+        <div v-if="contentResolution.hasError" class="extraction-error">
+          <p><em>⚠️ {{ contentResolution.errorMessage || 'Failed to extract full content' }}</em></p>
+          <p style="margin-top: 8px; font-size: 12px; color: #666;">
+            Showing feed content instead.
           </p>
         </div>
+
+        <!-- Show resolved content -->
+        <div v-if="resolvedContentHtml" class="item-content-html-wrapper">
+          <div class="item-content-html" v-html="resolvedContentHtml"></div>
+        </div>
         
-        <!-- Fallback to summary if no content_html (show as plain text, not HTML) -->
-        <template v-else>
-          <div v-if="hasValidSummary" class="item-summary">{{ cleanedSummary }}</div>
-          <div v-else-if="item.summary" class="item-summary-raw">
-            <p><em>Summary content filtered (may contain only links or minimal text)</em></p>
-            <details>
-              <summary style="cursor: pointer; color: #666; font-size: 14px;">Show raw content</summary>
-              <pre style="margin-top: 8px; padding: 12px; background: #f5f5f5; border-radius: 4px; font-size: 12px; overflow-x: auto;">{{ item.summary }}</pre>
-            </details>
-          </div>
-          <div v-else class="item-no-content">
-            <p><strong>No summary available in RSS feed</strong></p>
-            <p style="margin-top: 8px; font-size: 14px; color: #666;">
-              Many RSS feeds only provide titles and links. Click "Open Link" above to view the full article content on the original website.
-            </p>
-          </div>
-        </template>
+        <!-- Fallback to summary if no content -->
+        <div v-else-if="hasValidSummary" class="item-summary">{{ cleanedSummary }}</div>
+        <div v-else class="item-no-content">
+          <p><strong>No content available</strong></p>
+          <p style="margin-top: 8px; font-size: 14px; color: #666;">
+            Click "Open Link" above to view the full article content on the original website.
+          </p>
+        </div>
       </div>
 
       <!-- Footer -->
@@ -197,16 +206,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import type { Item } from '../types';
+import type { Item } from '../../types';
 import { 
   formatDate, 
   stripHtml, 
   parseGitHubNotificationSummary,
   extractGitHubRepo
-} from '../utils/formatting';
+} from '../../utils/formatting';
+import { useContent } from '../../composables/useContent';
 
 defineEmits<{
   (e: 'back'): void;
@@ -221,22 +231,46 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const metadataExpanded = ref(false);
 
+// Content resolution
+const { loadPreferences, getDisplayContent } = useContent();
+const contentResolution = computed(() => getDisplayContent(item.value));
+
+// Polling interval for extraction status
+let pollingInterval: number | null = null;
+
 const fetchItem = async () => {
   loading.value = true;
   error.value = null;
   try {
     item.value = await invoke<Item>('get_item', { id: props.itemId });
-    // Debug: log content_html
-    if (item.value) {
-      console.log('Item content_html exists:', !!item.value.content_html);
-      console.log('Item content_html length:', item.value.content_html?.length || 0);
-      console.log('Item content_html preview:', item.value.content_html?.substring(0, 200) || 'N/A');
-    }
   } catch (e) {
     error.value = e as string;
     console.error('Failed to fetch item:', e);
   } finally {
     loading.value = false;
+  }
+};
+
+// Start/stop polling when extraction is in progress
+watch(() => contentResolution.value.isFetching, (isFetching) => {
+  if (isFetching) {
+    startPolling();
+  } else {
+    stopPolling();
+  }
+});
+
+const startPolling = () => {
+  stopPolling(); // Clear any existing interval
+  pollingInterval = window.setInterval(() => {
+    fetchItem();
+  }, 2000); // Poll every 2 seconds
+};
+
+const stopPolling = () => {
+  if (pollingInterval !== null) {
+    clearInterval(pollingInterval);
+    pollingInterval = null;
   }
 };
 
@@ -280,28 +314,19 @@ const hasValidSummary = computed(() => {
   return cleanedSummary.value.length > 0;
 });
 
-const hasContentHtml = computed(() => {
-  return !!(item.value?.content_html && item.value.content_html.trim().length > 0);
-});
-
-// Decode HTML entities (fixes double-encoding issue)
-// The RSS feed may have HTML entities like &lt; &gt; &quot; etc. that need to be decoded
-// We decode entities but preserve the HTML structure
-// Also filter out duplicate "Comments" links if we have a comments URL
-const decodedContentHtml = computed(() => {
-  if (!item.value?.content_html) return '';
+// Get resolved content HTML
+const resolvedContentHtml = computed(() => {
+  const content = contentResolution.value.content;
+  if (!content) return '';
   
-  // Use a textarea element to decode HTML entities
-  // This is the standard way to decode HTML entities in the browser
+  // Decode HTML entities
   const textarea = document.createElement('textarea');
-  textarea.innerHTML = item.value.content_html;
+  textarea.innerHTML = content;
   let decoded = textarea.value;
   
   // If we have a comments URL, remove "Comments" links from the content to avoid duplicates
-  if (item.value.comments) {
-    // Remove links that contain "comment" in the text (case insensitive)
+  if (item.value?.comments) {
     decoded = decoded.replace(/<a[^>]*>.*?[Cc]omment[s]?.*?<\/a>/gi, '');
-    // Also remove standalone "Comments" text that might be leftover
     decoded = decoded.replace(/\b[Cc]omment[s]?\b(?=\s|$|\.|,)/g, '');
   }
   
@@ -319,11 +344,6 @@ const categories = computed(() => {
   }
 });
 
-// Check if categories overflow (more than 3 tags typically fit in one line)
-const hasCategoryOverflow = computed(() => {
-  return categories.value.length > 3;
-});
-
 const openComments = async () => {
   if (!item.value?.comments) return;
   
@@ -336,10 +356,6 @@ const openComments = async () => {
 };
 
 // GitHub-specific computed properties
-const isGitHubNotification = computed(() => {
-  return item.value?.item_type === 'notification';
-});
-
 const isGitHubEvent = computed(() => {
   return item.value?.item_type === 'event' || 
          (item.value?.summary?.includes('Event type:') ?? false);
@@ -418,8 +434,13 @@ const itemSubheading = computed(() => {
   return parts.join(' • ');
 });
 
-onMounted(() => {
-  fetchItem();
+onMounted(async () => {
+  await loadPreferences();
+  await fetchItem();
+});
+
+onUnmounted(() => {
+  stopPolling();
 });
 </script>
 
