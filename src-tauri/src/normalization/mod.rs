@@ -1,5 +1,6 @@
 use crate::storage::Database;
 use crate::ingestion::traits::IngestedItem;
+use crate::ingestion::content_detection::detect_content_completeness;
 use anyhow::Result;
 
 pub fn normalize_and_dedupe(
@@ -10,6 +11,10 @@ pub fn normalize_and_dedupe(
     let mut item_ids = Vec::new();
     
     for item in items {
+        // Detect content completeness
+        let detection_result = detect_content_completeness(&item);
+        let completeness_str = detection_result.completeness.as_str();
+        
         // Convert category Vec<String> to JSON string
         let category_json = item.category.as_ref().map(|cats| {
             serde_json::to_string(cats).unwrap_or_default()
@@ -28,6 +33,7 @@ pub fn normalize_and_dedupe(
             category_json.as_deref(),
             item.comments.as_deref(),
             item.thread_id.as_deref(),
+            Some(completeness_str),
         )?;
         
         item_ids.push(item_id);

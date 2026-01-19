@@ -37,4 +37,6 @@ anyhow = "1.0"
 regex = "1"
 urlencoding = "2.1"
 uuid = { version = "1.0", features = ["v4"] }
+readabilityrs = "0.1"
+ammonia = "4.1"
 
