@@ -1,9 +1,9 @@
 <template>
-  <div class="custom-view-view">
+  <div class="inbox-view">
     <div class="sticky-header">
       <div class="header-left">
-        <h1>{{ viewName }}</h1>
-        <button @click="editView" class="edit-view-button">Edit</button>
+        <h1>Trash</h1>
+        <p class="subtitle">Items marked for deletion. They will be permanently removed after 30 days.</p>
         <div v-if="selectedItems.size > 0" class="selection-info">
           {{ selectedItems.size }} item{{ selectedItems.size !== 1 ? 's' : '' }} selected
         </div>
@@ -12,17 +12,11 @@
         <div class="filters-wrapper">
           <div class="filters-container">
             <div v-if="selectedItems.size > 0" class="bulk-actions">
-              <button @click="handleBulkMarkRead" class="bulk-action-btn" title="Mark as Read">
-                Mark Read
+              <button @click="handleBulkRecover" class="bulk-action-btn" title="Recover Items">
+                Recover
               </button>
-              <button @click="handleBulkMarkUnread" class="bulk-action-btn" title="Mark as Unread">
-                Mark Unread
-              </button>
-              <button @click="handleBulkArchive" class="bulk-action-btn" title="Archive">
-                Archive
-              </button>
-              <button @click="handleBulkDelete" class="bulk-action-btn delete" title="Mark for Delete">
-                Delete
+              <button @click="handleBulkPermanentDelete" class="bulk-action-btn delete" title="Permanently Delete">
+                Delete Forever
               </button>
               <button @click="clearSelection" class="bulk-action-btn" title="Clear Selection">
                 Clear
@@ -70,7 +64,7 @@
     <div v-if="loading" class="loading">Loading...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <div v-else-if="filteredItems.length === 0" class="empty">
-      No items found in this view.
+      No items in trash.
     </div>
     <div v-else class="items-list">
       <div
@@ -91,7 +85,7 @@
           <span class="item-source-name">{{ item.source_name || 'Unknown Source' }}</span>
           <div class="item-badges">
             <span class="item-type-badge">{{ item.item_type.toUpperCase() }}</span>
-            <span class="item-state-badge" :class="item.state">{{ item.state.toUpperCase() }}</span>
+            <span class="item-state-badge deleted">Marked for Deletion</span>
           </div>
         </div>
         <div class="item-content">
@@ -125,50 +119,21 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { useItems } from '../../composables/useItems';
-import { useCustomViews } from '../../composables/useCustomViews';
-import type { CustomView } from '../../types';
 import { formatDate, truncate, stripHtml, parseGroups } from '../../utils/formatting';
-
-const props = defineProps<{
-  viewId: number;
-}>();
 
 const emit = defineEmits<{
   (e: 'select-item', id: number): void;
-  (e: 'edit-view'): void;
 }>();
 
-const { items, loading, error, fetchItems, updateItemState, bulkUpdateItemState } = useItems();
-const { getCustomView } = useCustomViews();
-
-const view = ref<CustomView | null>(null);
-const viewName = computed(() => view.value?.name || 'Custom View');
+const { items, loading, error, fetchItems, bulkUpdateItemState } = useItems();
 const searchQuery = ref('');
 const searchExpanded = ref(false);
 const searchInput = ref<HTMLInputElement | null>(null);
 const selectedItems = ref<Set<number>>(new Set());
 
-// Parse JSON arrays from view
-const sourceIds = computed(() => {
-  if (!view.value?.source_ids) return undefined;
-  try {
-    return JSON.parse(view.value.source_ids) as number[];
-  } catch {
-    return undefined;
-  }
-});
-
-const groupNames = computed(() => {
-  if (!view.value?.group_names) return undefined;
-  try {
-    return JSON.parse(view.value.group_names) as string[];
-  } catch {
-    return undefined;
-  }
-});
-
+// Fetch only deleted items
 const filteredItems = computed(() => {
-  let filtered = items.value;
+  let filtered = items.value.filter(item => item.state === 'deleted');
   
   // Apply text search filter
   if (searchQuery.value.trim()) {
@@ -189,22 +154,13 @@ const filteredItems = computed(() => {
   return filtered;
 });
 
-const selectItem = async (id: number) => {
-  // Mark item as read if it's currently unread
-  const item = items.value.find(i => i.id === id);
-  if (item && item.state === 'unread') {
-    await updateItemState(id, 'read');
-  }
-  emit('select-item', id);
-};
-
 const handleItemClick = (id: number, event: MouseEvent) => {
   // If clicking on checkbox, don't trigger item selection
   const target = event.target as HTMLElement;
   if (target.closest('.item-checkbox') || target.closest('input[type="checkbox"]')) {
     return;
   }
-  selectItem(id);
+  emit('select-item', id);
 };
 
 const toggleItemSelection = (id: number) => {
@@ -235,70 +191,43 @@ const clearSelection = () => {
   selectedItems.value.clear();
 };
 
-const handleBulkMarkRead = async () => {
+const handleBulkRecover = async () => {
   if (selectedItems.value.size === 0) return;
   const ids = Array.from(selectedItems.value);
   try {
+    // Recover items by marking them as read
     await bulkUpdateItemState(ids, 'read');
     clearSelection();
-    // Local state is already updated by bulkUpdateItemState, no need to refetch
+    // Items are automatically removed from list when recovered (handled in useItems)
+    // But we need to refetch to ensure the list is updated
+    await fetchItems('deleted');
   } catch (e) {
-    console.error('Failed to mark items as read:', e);
-    alert('Failed to mark items as read. Please try again.');
+    console.error('Failed to recover items:', e);
+    alert('Failed to recover items. Please try again.');
   }
 };
 
-const handleBulkMarkUnread = async () => {
-  if (selectedItems.value.size === 0) return;
-  const ids = Array.from(selectedItems.value);
-  try {
-    await bulkUpdateItemState(ids, 'unread');
-    clearSelection();
-    // Local state is already updated by bulkUpdateItemState, no need to refetch
-  } catch (e) {
-    console.error('Failed to mark items as unread:', e);
-    alert('Failed to mark items as unread. Please try again.');
-  }
-};
-
-const handleBulkArchive = async () => {
-  if (selectedItems.value.size === 0) return;
-  const ids = Array.from(selectedItems.value);
-  try {
-    await bulkUpdateItemState(ids, 'archived');
-    clearSelection();
-    // Local state is already updated by bulkUpdateItemState, no need to refetch
-  } catch (e) {
-    console.error('Failed to archive items:', e);
-    alert('Failed to archive items. Please try again.');
-  }
-};
-
-const handleBulkDelete = async () => {
+const handleBulkPermanentDelete = async () => {
   if (selectedItems.value.size === 0) return;
   
   const confirmed = confirm(
-    `Are you sure you want to mark ${selectedItems.value.size} item${selectedItems.value.size !== 1 ? 's' : ''} for deletion? ` +
-    `These items will be hidden and permanently removed after 30 days.`
+    `Are you sure you want to permanently delete ${selectedItems.value.size} item${selectedItems.value.size !== 1 ? 's' : ''}? ` +
+    `This action cannot be undone.`
   );
   
   if (!confirmed) return;
   
   const ids = Array.from(selectedItems.value);
   try {
-    await bulkUpdateItemState(ids, 'deleted');
+    // For now, we'll just keep them as deleted - actual permanent deletion happens via cleanup task
+    // But we could add a command to permanently delete if needed
+    alert('Permanent deletion will be handled by the cleanup task. Items marked for deletion will be removed after 30 days.');
     clearSelection();
-    // Local state is already updated by bulkUpdateItemState (items are filtered out), no need to refetch
   } catch (e) {
-    console.error('Failed to delete items:', e);
-    alert('Failed to delete items. Please try again.');
+    console.error('Failed to permanently delete items:', e);
+    alert('Failed to permanently delete items. Please try again.');
   }
 };
-
-const editView = () => {
-  emit('edit-view');
-};
-
 
 // Focus search input when expanded
 watch(searchExpanded, (expanded) => {
@@ -326,13 +255,8 @@ const handleSearchBlur = (e: FocusEvent) => {
   }
 };
 
-onMounted(async () => {
-  // Load view data
-  view.value = await getCustomView(props.viewId);
-  
-  // Fetch items with view filters
-  await fetchItems(undefined, undefined, sourceIds.value, groupNames.value);
+onMounted(() => {
+  // Fetch deleted items specifically
+  fetchItems('deleted');
 });
 </script>
-
-

@@ -3,10 +3,38 @@
     <div class="sticky-header">
       <div class="header-left">
         <h1>Today</h1>
+        <div v-if="selectedItems.size > 0" class="selection-info">
+          {{ selectedItems.size }} item{{ selectedItems.size !== 1 ? 's' : '' }} selected
+        </div>
       </div>
       <div class="header-right">
         <div class="filters-wrapper">
           <div class="filters-container">
+            <div v-if="selectedItems.size > 0" class="bulk-actions">
+              <button @click="handleBulkMarkRead" class="bulk-action-btn" title="Mark as Read">
+                Mark Read
+              </button>
+              <button @click="handleBulkMarkUnread" class="bulk-action-btn" title="Mark as Unread">
+                Mark Unread
+              </button>
+              <button @click="handleBulkArchive" class="bulk-action-btn" title="Archive">
+                Archive
+              </button>
+              <button @click="handleBulkDelete" class="bulk-action-btn delete" title="Mark for Delete">
+                Delete
+              </button>
+              <button @click="clearSelection" class="bulk-action-btn" title="Clear Selection">
+                Clear
+              </button>
+            </div>
+            <label v-else class="select-all-checkbox">
+              <input 
+                type="checkbox" 
+                :checked="allItemsSelected"
+                @change="toggleSelectAll"
+              />
+              <span>Select All</span>
+            </label>
             <div class="filters">
               <button
                 v-for="filter in filters"
@@ -91,9 +119,16 @@
         v-for="item in filteredItems"
         :key="item.id"
         class="item-card"
-        :class="item.state"
-        @click="selectItem(item.id)"
+        :class="[item.state, { selected: selectedItems.has(item.id) }]"
+        @click="handleItemClick(item.id, $event)"
       >
+        <label class="item-checkbox" @click.stop>
+          <input 
+            type="checkbox" 
+            :checked="selectedItems.has(item.id)"
+            @change="toggleItemSelection(item.id)"
+          />
+        </label>
         <div class="item-card-header">
           <span class="item-source-name">{{ item.source_name || 'Unknown Source' }}</span>
           <div class="item-badges">
@@ -139,7 +174,7 @@ const emit = defineEmits<{
   (e: 'select-item', id: number): void;
 }>();
 
-const { items, loading, error, fetchItems, updateItemState } = useItems();
+const { items, loading, error, fetchItems, updateItemState, bulkUpdateItemState } = useItems();
 const { fetchSources } = useSources();
 const currentFilter = ref<string | null>(null);
 const selectedGroups = ref<string[]>([]);
@@ -147,6 +182,7 @@ const showGroupDropdown = ref(false);
 const searchQuery = ref('');
 const searchExpanded = ref(false);
 const searchInput = ref<HTMLInputElement | null>(null);
+const selectedItems = ref<Set<number>>(new Set());
 
 const filters = ['All', 'Unread', 'Read', 'Archived'];
 
@@ -244,6 +280,103 @@ const selectItem = async (id: number) => {
     await updateItemState(id, 'read');
   }
   emit('select-item', id);
+};
+
+const handleItemClick = (id: number, event: MouseEvent) => {
+  // If clicking on checkbox, don't trigger item selection
+  const target = event.target as HTMLElement;
+  if (target.closest('.item-checkbox') || target.closest('input[type="checkbox"]')) {
+    return;
+  }
+  selectItem(id);
+};
+
+const toggleItemSelection = (id: number) => {
+  if (selectedItems.value.has(id)) {
+    selectedItems.value.delete(id);
+  } else {
+    selectedItems.value.add(id);
+  }
+};
+
+const toggleSelectAll = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  if (target.checked) {
+    filteredItems.value.forEach(item => {
+      selectedItems.value.add(item.id);
+    });
+  } else {
+    selectedItems.value.clear();
+  }
+};
+
+const allItemsSelected = computed(() => {
+  return filteredItems.value.length > 0 && 
+         filteredItems.value.every(item => selectedItems.value.has(item.id));
+});
+
+const clearSelection = () => {
+  selectedItems.value.clear();
+};
+
+const handleBulkMarkRead = async () => {
+  if (selectedItems.value.size === 0) return;
+  const ids = Array.from(selectedItems.value);
+  try {
+    await bulkUpdateItemState(ids, 'read');
+    clearSelection();
+    // Local state is already updated by bulkUpdateItemState, no need to refetch
+  } catch (e) {
+    console.error('Failed to mark items as read:', e);
+    alert('Failed to mark items as read. Please try again.');
+  }
+};
+
+const handleBulkMarkUnread = async () => {
+  if (selectedItems.value.size === 0) return;
+  const ids = Array.from(selectedItems.value);
+  try {
+    await bulkUpdateItemState(ids, 'unread');
+    clearSelection();
+    // Local state is already updated by bulkUpdateItemState, no need to refetch
+  } catch (e) {
+    console.error('Failed to mark items as unread:', e);
+    alert('Failed to mark items as unread. Please try again.');
+  }
+};
+
+const handleBulkArchive = async () => {
+  if (selectedItems.value.size === 0) return;
+  const ids = Array.from(selectedItems.value);
+  try {
+    await bulkUpdateItemState(ids, 'archived');
+    clearSelection();
+    // Local state is already updated by bulkUpdateItemState, no need to refetch
+  } catch (e) {
+    console.error('Failed to archive items:', e);
+    alert('Failed to archive items. Please try again.');
+  }
+};
+
+const handleBulkDelete = async () => {
+  if (selectedItems.value.size === 0) return;
+  
+  const confirmed = confirm(
+    `Are you sure you want to mark ${selectedItems.value.size} item${selectedItems.value.size !== 1 ? 's' : ''} for deletion? ` +
+    `These items will be hidden and permanently removed after 30 days.`
+  );
+  
+  if (!confirmed) return;
+  
+  const ids = Array.from(selectedItems.value);
+  try {
+    await bulkUpdateItemState(ids, 'deleted');
+    clearSelection();
+    // Local state is already updated by bulkUpdateItemState (items are filtered out), no need to refetch
+  } catch (e) {
+    console.error('Failed to delete items:', e);
+    alert('Failed to delete items. Please try again.');
+  }
 };
 
 

@@ -115,6 +115,7 @@
             Last synced: {{ formatDate(source.last_synced_at) }}
           </p>
           <p v-else>Never synced</p>
+          <p class="source-endpoint">{{ getSourceEndpoint(source) }}</p>
         </div>
       </div>
         </div>
@@ -1157,6 +1158,42 @@ const getSourceGroupNames = (source: Source): string[] => {
   return source.group_ids
     .map(id => groups.value.find(g => g.id === id)?.name)
     .filter((name): name is string => name !== undefined);
+};
+
+// Get endpoint URL/description for a source
+const getSourceEndpoint = (source: Source): string => {
+  let config: Record<string, any> = {};
+  
+  // Parse config_json if it's a string
+  if (typeof source.config_json === 'string') {
+    try {
+      config = JSON.parse(source.config_json);
+    } catch (e) {
+      console.error('Failed to parse config_json:', e);
+      config = {};
+    }
+  } else {
+    config = source.config_json || {};
+  }
+  
+  // Extract endpoint based on source type
+  if (source.source_type === 'rss' || source.source_type === 'atom') {
+    return config.url || 'No URL configured';
+  } else if (source.source_type === 'github') {
+    const repos = config.repositories || [];
+    if (repos.length > 0) {
+      if (repos.length <= 3) {
+        return `Repos: ${repos.join(', ')}`;
+      } else {
+        return `Repos: ${repos.slice(0, 3).join(', ')} + ${repos.length - 3} more`;
+      }
+    }
+    return 'GitHub API';
+  } else if (source.source_type === 'github_notifications') {
+    return 'GitHub Notifications API';
+  }
+  
+  return 'Unknown endpoint';
 };
 
 // Get count of sources using a group

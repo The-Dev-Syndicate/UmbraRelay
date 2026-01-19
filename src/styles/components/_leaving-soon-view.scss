@@ -9,12 +9,29 @@
 
 .header {
   margin-bottom: $spacing-lg;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: $spacing-lg;
 
-  h1 {
-    margin: 0 0 $spacing-xs 0;
-    font-size: $font-lg;
-    font-weight: $font-semibold;
-    letter-spacing: -0.2px;
+  .header-left {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+    flex: 1;
+
+    h1 {
+      margin: 0;
+      font-size: $font-lg;
+      font-weight: $font-semibold;
+      letter-spacing: -0.2px;
+    }
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: $spacing-md;
   }
 }
 

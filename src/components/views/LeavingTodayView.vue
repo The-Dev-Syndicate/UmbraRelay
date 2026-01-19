@@ -2,8 +2,8 @@
   <div class="leaving-soon-view">
     <div class="header">
       <div class="header-left">
-        <h1>Leaving Soon</h1>
-        <p class="subtitle">Items that will be deleted in 7 days or less</p>
+        <h1>Leaving Today</h1>
+        <p class="subtitle">Items that will be deleted after today (1 day or less remaining)</p>
         <div v-if="selectedItems.size > 0" class="selection-info">
           {{ selectedItems.size }} item{{ selectedItems.size !== 1 ? 's' : '' }} selected
         </div>
@@ -42,7 +42,7 @@
     <div v-if="loading" class="loading">Loading...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <div v-else-if="filteredItems.length === 0" class="empty">
-      No items leaving soon.
+      No items leaving today.
     </div>
     <div v-else class="items-list">
       <div
@@ -122,7 +122,7 @@ const daysUntilRemoval = (item: Item): number => {
   return Math.max(0, daysLeft);
 };
 
-// Filter items that are 23+ days old (7 days or less until deletion) and not archived
+// Filter items that are 29+ days old (1 day or less until deletion) and not archived
 const filteredItems = computed(() => {
   const now = Math.floor(Date.now() / 1000);
   
@@ -135,8 +135,8 @@ const filteredItems = computed(() => {
       const itemAge = now - item.created_at;
       const daysOld = Math.floor(itemAge / (24 * 60 * 60));
       
-      // Show items that are 23+ days old (7 days or less until deletion)
-      return daysOld >= 23 && daysOld < 30;
+      // Show items that are 29+ days old (1 day or less until deletion)
+      return daysOld >= 29 && daysOld < 30;
     })
     .sort((a, b) => {
       // Sort by oldest first (reverse date order)
@@ -255,5 +255,3 @@ onMounted(() => {
   fetchItems();
 });
 </script>
-
-

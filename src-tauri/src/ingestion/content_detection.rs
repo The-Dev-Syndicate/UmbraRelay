@@ -1,5 +1,10 @@
 use super::traits::IngestedItem;
 use regex::Regex;
+use once_cell::sync::Lazy;
+
+// Compile regexes once instead of on every call
+static HTML_TAG_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"<[^>]+>").unwrap());
+static LINK_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"<a[^>]*>.*?</a>").unwrap());
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ContentCompleteness {
@@ -45,9 +50,7 @@ pub fn detect_content_completeness(item: &IngestedItem) -> DetectionResult {
     // Signal 2: HTML structure detection
     let has_html_tags = content_html.contains('<') && content_html.contains('>');
     let html_tag_count = if has_html_tags {
-        Regex::new(r"<[^>]+>").unwrap()
-            .find_iter(content_html)
-            .count()
+        HTML_TAG_REGEX.find_iter(content_html).count()
     } else {
         0
     };
@@ -65,8 +68,7 @@ pub fn detect_content_completeness(item: &IngestedItem) -> DetectionResult {
         if content_length == 0 {
             false
         } else {
-            let link_re = Regex::new(r"<a[^>]*>.*?</a>").unwrap();
-            let link_matches: Vec<_> = link_re.find_iter(content_html).collect();
+            let link_matches: Vec<_> = LINK_REGEX.find_iter(content_html).collect();
             let link_text_length: usize = link_matches.iter()
                 .map(|m| m.as_str().len())
                 .sum();

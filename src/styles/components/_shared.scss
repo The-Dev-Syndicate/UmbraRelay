@@ -10,6 +10,7 @@
   padding: $spacing-md; // More compact padding
   transition: all $transition-base;
   cursor: pointer;
+  position: relative;
   
   @include card-hover;
 
@@ -25,6 +26,68 @@
   &.archived {
     opacity: 0.7;
   }
+  
+  &.selected {
+    border: 2px solid var(--color-primary);
+    background: rgba(var(--color-primary-rgb, 90, 141, 232), 0.1);
+  }
+}
+
+.item-checkbox {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 1000;
+  cursor: pointer;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  
+  input[type="checkbox"] {
+    cursor: pointer;
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    padding: 0;
+    border: 2px solid var(--color-text-muted);
+    border-radius: 4px;
+    background: transparent;
+    appearance: none;
+    -webkit-appearance: none;
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: block !important;
+    pointer-events: auto;
+    position: relative;
+    transition: all 0.2s ease;
+    
+    &:hover {
+      border-color: var(--color-primary);
+      background: rgba(var(--color-primary-rgb, 90, 141, 232), 0.1);
+    }
+    
+    &:checked {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      
+      &::after {
+        content: '';
+        position: absolute;
+        left: 6px;
+        top: 2px;
+        width: 5px;
+        height: 10px;
+        border: solid white;
+        border-width: 0 2px 2px 0;
+        transform: rotate(45deg);
+      }
+    }
+  }
 }
 
 .item-card-header {
@@ -33,6 +96,7 @@
   align-items: center;
   margin-bottom: $spacing-xs;
   padding-bottom: $spacing-xs;
+  padding-left: 40px; // Make room for checkbox (10px left + 24px width + 6px gap)
   border-bottom: 1px solid var(--color-border-light);
   gap: $spacing-sm;
 }
@@ -47,6 +111,7 @@
 
 .item-content {
   flex: 1;
+  padding-left: 40px; // Make room for checkbox
 }
 
 .item-content-wrapper {
@@ -116,6 +181,13 @@
     background: var(--color-badge-archived);
     color: var(--color-badge-archived-text);
   }
+
+  &.deleted {
+    background: #f44336;
+    color: white;
+    text-transform: none; // Override uppercase for "Marked for Deletion"
+    font-size: $font-xs;
+  }
 }
 
 .item-title {
@@ -149,6 +221,7 @@
   color: var(--color-text-muted);
   margin-top: $spacing-xs;
   padding-top: $spacing-xs;
+  padding-left: 40px; // Make room for checkbox
   border-top: 1px solid var(--color-border-light);
   gap: $spacing-sm;
 }

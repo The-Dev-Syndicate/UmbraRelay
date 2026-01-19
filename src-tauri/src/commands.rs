@@ -66,6 +66,17 @@ pub async fn update_item_state(
 }
 
 #[tauri::command]
+pub async fn bulk_update_item_state(
+    db: State<'_, Mutex<Database>>,
+    ids: Vec<i64>,
+    state: String,
+) -> Result<usize, String> {
+    let db = db.lock().map_err(|e| format!("Database lock error: {}", e))?;
+    db.bulk_update_item_state(&ids, &state)
+        .map_err(|e| format!("Failed to bulk update item state: {}", e))
+}
+
+#[tauri::command]
 pub async fn clear_source_items(
     db: State<'_, Mutex<Database>>,
     source_name: String,

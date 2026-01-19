@@ -6,7 +6,7 @@ export interface Item {
   summary: string | null;
   url: string;
   item_type: 'rss' | 'atom' | 'issue' | 'pr' | 'notification' | 'event' | 'commit';
-  state: 'unread' | 'read' | 'archived';
+  state: 'unread' | 'read' | 'archived' | 'deleted';
   created_at: number;
   updated_at: number;
   image_url?: string | null;

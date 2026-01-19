@@ -405,6 +405,11 @@ impl Database {
         let mut string_params: Vec<String> = Vec::new();
         let mut int_params: Vec<i64> = Vec::new();
         
+        // Always exclude deleted items unless explicitly requested
+        if state_filter != Some("deleted") {
+            conditions.push("i.state != 'deleted'".to_string());
+        }
+        
         // State filter
         if let Some(state) = state_filter {
             conditions.push("i.state = ?".to_string());
@@ -546,6 +551,32 @@ impl Database {
             params![state, now, id],
         )?;
         Ok(())
+    }
+
+    /// Updates multiple items' state in a single transaction
+    pub fn bulk_update_item_state(&self, ids: &[i64], state: &str) -> Result<usize> {
+        let conn = self.conn.lock().unwrap();
+        let now = Utc::now().timestamp();
+        
+        if ids.is_empty() {
+            return Ok(0);
+        }
+        
+        // Build placeholders for the IN clause
+        let placeholders: Vec<String> = (1..=ids.len()).map(|_| "?".to_string()).collect();
+        let query = format!(
+            "UPDATE items SET state = ?, updated_at = ? WHERE id IN ({})",
+            placeholders.join(", ")
+        );
+        
+        // Build params: state, updated_at, then all IDs
+        let mut params: Vec<&dyn rusqlite::ToSql> = vec![&state, &now];
+        for id in ids {
+            params.push(id);
+        }
+        
+        let updated = conn.execute(&query, rusqlite::params_from_iter(params.iter()))?;
+        Ok(updated)
     }
 
 

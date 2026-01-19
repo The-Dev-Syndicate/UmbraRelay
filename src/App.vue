@@ -35,6 +35,22 @@
               <span class="nav-icon">📦</span>
               <span>All Items</span>
             </button>
+            <button
+              :class="{ active: currentView === 'leaving-today' }"
+              @click="currentView = 'leaving-today'; selectedItemId = null"
+              class="nav-button nav-sub-item"
+            >
+              <span class="nav-icon">⏰</span>
+              <span>Leaving Today</span>
+            </button>
+            <button
+              :class="{ active: currentView === 'trash' }"
+              @click="currentView = 'trash'; selectedItemId = null"
+              class="nav-button nav-sub-item"
+            >
+              <span class="nav-icon">🗑️</span>
+              <span>Trash</span>
+            </button>
           </div>
         </div>
 
@@ -169,6 +185,16 @@
         @select-item="selectItem"
         key="all-items"
       />
+      <TrashView
+        v-else-if="currentView === 'trash' && !selectedItemId"
+        @select-item="selectItem"
+        key="trash"
+      />
+      <LeavingTodayView
+        v-else-if="currentView === 'leaving-today' && !selectedItemId"
+        @select-item="selectItem"
+        key="leaving-today"
+      />
       <InboxView
         v-else-if="currentViewType === 'source' && !selectedItemId"
         :source-id="currentSourceId ?? undefined"
@@ -176,7 +202,7 @@
         :key="`source-${currentSourceId}`"
       />
       <ItemDetail
-        v-else-if="(currentView === 'today' || currentView === 'all-items' || currentViewType === 'source' || currentView === 'leaving-soon' || typeof currentView === 'number') && selectedItemId"
+        v-else-if="(currentView === 'today' || currentView === 'all-items' || currentView === 'trash' || currentView === 'leaving-today' || currentViewType === 'source' || currentView === 'leaving-soon' || typeof currentView === 'number') && selectedItemId"
         :item-id="selectedItemId"
         @back="selectedItemId = null"
         key="item-detail"
@@ -217,9 +243,11 @@ import { ref, onMounted, computed, watch, nextTick } from 'vue';
 import InboxView from './components/views/InboxView.vue';
 import TodayView from './components/views/TodayView.vue';
 import LeavingSoonView from './components/views/LeavingSoonView.vue';
+import LeavingTodayView from './components/views/LeavingTodayView.vue';
 import CustomView from './components/views/CustomView.vue';
 import CustomViewConfig from './components/views/CustomViewConfig.vue';
 import ItemDetail from './components/views/ItemDetail.vue';
+import TrashView from './components/views/TrashView.vue';
 import Config from './components/settings/Config.vue';
 import LinkHoverPreview from './components/base/LinkHoverPreview.vue';
 import { useCustomViews } from './composables/useCustomViews';
@@ -229,7 +257,7 @@ import { useTheme } from './composables/useTheme';
 // Initialize theme system
 useTheme();
 
-type ViewType = 'today' | 'all-items' | 'leaving-soon' | 'sources' | number | string;
+type ViewType = 'today' | 'all-items' | 'trash' | 'leaving-today' | 'leaving-soon' | 'sources' | number | string;
 
 const currentView = ref<ViewType>('today');
 const selectedItemId = ref<number | null>(null);
