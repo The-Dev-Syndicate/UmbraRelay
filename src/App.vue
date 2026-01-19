@@ -186,17 +186,17 @@
         @select-item="selectItem"
         key="leaving-soon"
       />
-      <CustomViewView
+      <CustomView
         v-else-if="typeof currentView === 'number' && !selectedItemId"
         :view-id="currentView"
         @select-item="selectItem"
         @edit-view="openEditView(currentView)"
         key="custom-view"
       />
-      <SourceConfig 
+      <Config 
         v-else-if="currentView === 'sources'" 
         key="sources"
-        ref="sourceConfigRef"
+        ref="configRef"
       />
       <div v-else class="fallback">
         <p>Select a view from the sidebar</p>
@@ -214,14 +214,14 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed, watch, nextTick } from 'vue';
-import InboxView from './components/InboxView.vue';
-import TodayView from './components/TodayView.vue';
-import LeavingSoonView from './components/LeavingSoonView.vue';
-import CustomViewView from './components/CustomViewView.vue';
-import CustomViewConfig from './components/CustomViewConfig.vue';
-import ItemDetail from './components/ItemDetail.vue';
-import SourceConfig from './components/SourceConfig.vue';
-import LinkHoverPreview from './components/LinkHoverPreview.vue';
+import InboxView from './components/views/InboxView.vue';
+import TodayView from './components/views/TodayView.vue';
+import LeavingSoonView from './components/views/LeavingSoonView.vue';
+import CustomView from './components/views/CustomView.vue';
+import CustomViewConfig from './components/views/CustomViewConfig.vue';
+import ItemDetail from './components/views/ItemDetail.vue';
+import Config from './components/settings/Config.vue';
+import LinkHoverPreview from './components/base/LinkHoverPreview.vue';
 import { useCustomViews } from './composables/useCustomViews';
 import { useSources } from './composables/useSources';
 import { useTheme } from './composables/useTheme';
@@ -246,7 +246,7 @@ const previousMyViewsExpanded = ref(false);
 const { customViews, fetchCustomViews, deleteCustomView } = useCustomViews();
 const { sources, fetchSources, syncAllSources } = useSources();
 
-const sourceConfigRef = ref<InstanceType<typeof SourceConfig> | null>(null);
+const configRef = ref<InstanceType<typeof Config> | null>(null);
 const syncingAll = ref(false);
 
 // Parse current view to determine if it's a source view
@@ -361,10 +361,10 @@ const handleAddSource = () => {
   // Navigate to sources page and trigger add source modal
   currentView.value = 'sources';
   selectedItemId.value = null;
-  // Use nextTick to ensure SourceConfig is mounted before accessing ref
+  // Use nextTick to ensure Config is mounted before accessing ref
   nextTick(() => {
-    if (sourceConfigRef.value && 'openAddSourceModal' in sourceConfigRef.value) {
-      (sourceConfigRef.value as any).openAddSourceModal();
+    if (configRef.value && 'openAddSourceModal' in configRef.value) {
+      (configRef.value as any).openAddSourceModal();
     }
   });
 };

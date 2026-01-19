@@ -115,8 +115,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
-import type { Secret } from '../types';
-import { formatDate } from '../utils/formatting';
+import type { Secret } from '../../types';
+import { formatDate } from '../../utils/formatting';
 import { ask, MessageDialogOptions } from '@tauri-apps/plugin-dialog';
 
 const secrets = ref<Secret[]>([]);

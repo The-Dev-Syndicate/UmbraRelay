@@ -209,14 +209,14 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import type { Item } from '../types';
+import type { Item } from '../../types';
 import { 
   formatDate, 
   stripHtml, 
   parseGitHubNotificationSummary,
   extractGitHubRepo
-} from '../utils/formatting';
-import { useContent } from '../composables/useContent';
+} from '../../utils/formatting';
+import { useContent } from '../../composables/useContent';
 
 defineEmits<{
   (e: 'back'): void;
@@ -314,11 +314,6 @@ const hasValidSummary = computed(() => {
   return cleanedSummary.value.length > 0;
 });
 
-// Keep for backward compatibility but use resolved content instead
-const hasContentHtml = computed(() => {
-  return resolvedContentHtml.value.length > 0;
-});
-
 // Get resolved content HTML
 const resolvedContentHtml = computed(() => {
   const content = contentResolution.value.content;
@@ -349,11 +344,6 @@ const categories = computed(() => {
   }
 });
 
-// Check if categories overflow (more than 3 tags typically fit in one line)
-const hasCategoryOverflow = computed(() => {
-  return categories.value.length > 3;
-});
-
 const openComments = async () => {
   if (!item.value?.comments) return;
   
@@ -366,10 +356,6 @@ const openComments = async () => {
 };
 
 // GitHub-specific computed properties
-const isGitHubNotification = computed(() => {
-  return item.value?.item_type === 'notification';
-});
-
 const isGitHubEvent = computed(() => {
   return item.value?.item_type === 'event' || 
          (item.value?.summary?.includes('Event type:') ?? false);

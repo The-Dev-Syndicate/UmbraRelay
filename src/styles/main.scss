@@ -15,11 +15,13 @@
 @use 'components/app';
 @use 'components/inbox-view';
 @use 'components/item-detail';
-@use 'components/source-config';
+@use 'components/config';
 @use 'components/custom-view-view';
 @use 'components/custom-view-config';
 @use 'components/leaving-soon-view';
 @use 'components/link-hover-preview';
+@use 'components/tabbed-view';
+@use 'components/settings-section';
 
 // Global styles
 * {

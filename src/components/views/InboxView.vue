@@ -144,9 +144,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import { useItems } from '../composables/useItems';
-import { useSources } from '../composables/useSources';
-import { formatDate, truncate, stripHtml, parseGroups } from '../utils/formatting';
+import { useItems } from '../../composables/useItems';
+import { useSources } from '../../composables/useSources';
+import { formatDate, truncate, stripHtml, parseGroups } from '../../utils/formatting';
 
 const props = defineProps<{
   sourceId?: number;

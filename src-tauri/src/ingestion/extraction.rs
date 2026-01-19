@@ -58,7 +58,6 @@ pub fn extract_full_text(url: &str) -> Result<ExtractionResult> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     
     // Note: These tests require network access and may be flaky
     // In a real scenario, you'd mock the HTTP client

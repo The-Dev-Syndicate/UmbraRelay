@@ -96,10 +96,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import { useCustomViews } from '../composables/useCustomViews';
-import { useSources } from '../composables/useSources';
-import { useGroups } from '../composables/useGroups';
-import type { CustomViewInput } from '../types';
+import { useCustomViews } from '../../composables/useCustomViews';
+import { useSources } from '../../composables/useSources';
+import { useGroups } from '../../composables/useGroups';
+import type { CustomViewInput } from '../../types';
 
 const props = defineProps<{
   viewId?: number | null;
