@@ -36,9 +36,7 @@ pub fn extract_full_text(url: &str) -> Result<ExtractionResult> {
     
     // Use readability to extract main content with explicit configuration
     let mut options = ReadabilityOptions::default();
-    options.min_text_length = Some(100); // Minimum 100 chars of content to consider it extractable
-    options.retry_length = Some(250); // Retry if first attempt is less than 250 chars
-    options.word_threshold = Some(100); // Consider article valid if more than 100 words
+    options.char_threshold = 100; // Minimum 100 chars of content to consider it extractable
 
     let readability = Readability::new(&html, Some(url), Some(options))
         .context("Failed to initialize readability")?;
@@ -53,10 +51,8 @@ pub fn extract_full_text(url: &str) -> Result<ExtractionResult> {
 
     // Sanitize HTML to remove dangerous elements with explicit configuration
     let sanitized = Builder::default()
-        .url_relative_to(Some(url))
+        .url_relative(Some(url))
         .link_rel(Some("noopener noreferrer"))
-        .build()
-        .context("Failed to build HTML sanitizer")?
         .clean(&extracted_html)
         .to_string();
 
