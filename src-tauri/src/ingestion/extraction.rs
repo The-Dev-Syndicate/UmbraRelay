@@ -51,7 +51,6 @@ pub fn extract_full_text(url: &str) -> Result<ExtractionResult> {
 
     // Sanitize HTML to remove dangerous elements with explicit configuration
     let sanitized = Builder::default()
-        .url_relative(Some(url))
         .link_rel(Some("noopener noreferrer"))
         .clean(&extracted_html)
         .to_string();
