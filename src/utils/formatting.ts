@@ -46,6 +46,43 @@ export function stripHtml(html: string): string {
 }
 
 /**
+ * Decode HTML entities in a string without using DOM (efficient)
+ * @param html HTML string potentially containing encoded entities
+ * @returns String with HTML entities decoded
+ */
+export function decodeHtmlEntities(html: string): string {
+  if (!html) return '';
+
+  const entities: Record<string, string> = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+    '&apos;': "'",
+    '&nbsp;': ' ',
+  };
+
+  // Decode basic HTML entities efficiently
+  let decoded = html;
+  for (const [entity, char] of Object.entries(entities)) {
+    decoded = decoded.split(entity).join(char);
+  }
+
+  // Handle numeric entities like &#123;
+  decoded = decoded.replace(/&#(\d+);/g, (match, dec) => {
+    return String.fromCharCode(parseInt(dec, 10));
+  });
+
+  // Handle hex entities like &#x1A;
+  decoded = decoded.replace(/&#x([0-9a-fA-F]+);/g, (match, hex) => {
+    return String.fromCharCode(parseInt(hex, 16));
+  });
+
+  return decoded;
+}
+
+/**
  * Parse a comma-separated group string into an array of group names
  * @param groupString Comma-separated group string or null/undefined
  * @returns Array of trimmed group names

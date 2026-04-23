@@ -91,30 +91,13 @@ pub async fn get_sources(
     db: State<'_, Mutex<Database>>,
 ) -> Result<Vec<serde_json::Value>, String> {
     let db_guard = db.lock().map_err(|e| format!("Database lock error: {}", e))?;
-    let sources = db_guard.get_all_sources()
+    let sources = db_guard.get_all_sources_with_groups()
         .map_err(|e| format!("Failed to get sources: {}", e))?;
-    
-    // Get group_ids for each source
-    let mut result = Vec::new();
-    for source in sources {
-        let group_ids = db_guard.get_source_groups(source.id)
-            .unwrap_or_default();
-        
-        // Convert Source to JSON and add group_ids
-        let mut source_json = serde_json::to_value(&source)
-            .map_err(|e| format!("Failed to serialize source: {}", e))?;
-        
-        if let Some(obj) = source_json.as_object_mut() {
-            if !group_ids.is_empty() {
-                obj.insert("group_ids".to_string(), serde_json::to_value(group_ids).unwrap());
-            } else {
-                obj.insert("group_ids".to_string(), serde_json::json!([]));
-            }
-        }
-        
-        result.push(source_json);
-    }
-    
+
+    let result: Vec<serde_json::Value> = sources.iter()
+        .map(|source| serde_json::to_value(source).unwrap_or(serde_json::json!({})))
+        .collect();
+
     Ok(result)
 }
 

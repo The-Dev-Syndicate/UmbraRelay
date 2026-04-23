@@ -67,6 +67,42 @@ impl Source {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SourceWithGroups {
+    pub id: i64,
+    pub source_type: String,
+    pub name: String,
+    pub config_json: String,
+    pub enabled: bool,
+    pub last_synced_at: Option<i64>,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub group_ids: Vec<i64>,
+}
+
+impl SourceWithGroups {
+    pub fn from_row(row: &Row) -> rusqlite::Result<SourceWithGroups> {
+        let group_ids_str: Option<String> = row.get(8).ok().flatten();
+        let group_ids: Vec<i64> = group_ids_str
+            .unwrap_or_default()
+            .split(',')
+            .filter_map(|s| s.parse::<i64>().ok())
+            .collect();
+
+        Ok(SourceWithGroups {
+            id: row.get(0)?,
+            source_type: row.get(1)?,
+            name: row.get(2)?,
+            config_json: row.get(3)?,
+            enabled: row.get::<_, i64>(4)? != 0,
+            last_synced_at: row.get(5)?,
+            created_at: row.get(6)?,
+            updated_at: row.get(7)?,
+            group_ids,
+        })
+    }
+}
+
 impl Item {
     pub fn from_row(row: &Row) -> rusqlite::Result<Item> {
         Ok(Item {

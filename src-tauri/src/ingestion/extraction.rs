@@ -2,7 +2,7 @@ use anyhow::{Result, Context};
 use reqwest::blocking::Client;
 use std::time::Duration;
 use readabilityrs::{Readability, ReadabilityOptions};
-use ammonia::clean;
+use ammonia::Builder;
 
 #[derive(Debug, Clone)]
 pub struct ExtractionResult {
@@ -34,22 +34,32 @@ pub fn extract_full_text(url: &str) -> Result<ExtractionResult> {
     let html = response.text()
         .context("Failed to read response body")?;
     
-    // Use readability to extract main content
-    let options = ReadabilityOptions::default();
+    // Use readability to extract main content with explicit configuration
+    let mut options = ReadabilityOptions::default();
+    options.min_text_length = Some(100); // Minimum 100 chars of content to consider it extractable
+    options.retry_length = Some(250); // Retry if first attempt is less than 250 chars
+    options.word_threshold = Some(100); // Consider article valid if more than 100 words
+
     let readability = Readability::new(&html, Some(url), Some(options))
         .context("Failed to initialize readability")?;
-    
+
     let article = readability.parse()
         .ok_or_else(|| anyhow::anyhow!("Failed to extract article content - no readable content found"))?;
-    
+
     // Get extracted content - handle Option types
     let extracted_html = article.content
         .ok_or_else(|| anyhow::anyhow!("No content extracted from article"))?;
     let extracted_title = article.title;
-    
-    // Sanitize HTML to remove dangerous elements (scripts, iframes, etc.)
-    let sanitized = clean(&extracted_html);
-    
+
+    // Sanitize HTML to remove dangerous elements with explicit configuration
+    let sanitized = Builder::default()
+        .url_relative_to(Some(url))
+        .link_rel(Some("noopener noreferrer"))
+        .build()
+        .context("Failed to build HTML sanitizer")?
+        .clean(&extracted_html)
+        .to_string();
+
     Ok(ExtractionResult {
         content: sanitized,
         title: extracted_title,

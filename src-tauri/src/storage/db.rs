@@ -129,9 +129,16 @@ impl Database {
                 ALTER TABLE items ADD COLUMN content_completeness TEXT;
                 ALTER TABLE items ADD COLUMN extraction_attempted_at INTEGER;
                 ALTER TABLE items ADD COLUMN extraction_failed_reason TEXT;
-                
+
                 -- Index for content_status to speed up queries
                 CREATE INDEX IF NOT EXISTS idx_items_content_status ON items(content_status);
+                "#
+            ),
+            M::up(
+                r#"
+                -- Add composite and covering indexes for query optimization
+                CREATE INDEX IF NOT EXISTS idx_items_state_created ON items(state, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_source_groups_covering ON source_groups(source_id, group_id);
                 "#
             ),
         ]);
@@ -150,9 +157,9 @@ impl Database {
                         "CREATE INDEX IF NOT EXISTS idx_items_content_status ON items(content_status)",
                         [],
                     );
-                    // Update migration version to 2 since columns already exist
+                    // Update migration version to 3 since columns already exist
                     let _ = conn.execute(
-                        "UPDATE schema_migrations SET version = 2 WHERE version < 2",
+                        "UPDATE schema_migrations SET version = 3 WHERE version < 3",
                         [],
                     );
                     // Continue - migration is effectively done, columns will be ensured below
@@ -167,9 +174,9 @@ impl Database {
                     ).unwrap_or(false);
                     
                     if schema_ok {
-                        // Schema is correct, just update the version to match our migrations (we have 2 migrations now)
+                        // Schema is correct, just update the version to match our migrations (we have 3 migrations now)
                         let _ = conn.execute(
-                            "UPDATE schema_migrations SET version = 2",
+                            "UPDATE schema_migrations SET version = 3",
                             [],
                         );
                     } else {
@@ -266,6 +273,20 @@ impl Database {
             r#"SELECT id, type, name, config_json, enabled, last_synced_at, created_at, updated_at FROM sources ORDER BY created_at DESC"#
         )?;
         let sources = stmt.query_map([], |row| Source::from_row(row))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(sources)
+    }
+
+    pub fn get_all_sources_with_groups(&self) -> Result<Vec<super::models::SourceWithGroups>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            r#"SELECT s.id, s.type, s.name, s.config_json, s.enabled, s.last_synced_at, s.created_at, s.updated_at, GROUP_CONCAT(sg.group_id, ',') as group_ids
+               FROM sources s
+               LEFT JOIN source_groups sg ON s.id = sg.source_id
+               GROUP BY s.id
+               ORDER BY s.created_at DESC"#
+        )?;
+        let sources = stmt.query_map([], |row| super::models::SourceWithGroups::from_row(row))?
             .collect::<Result<Vec<_>, _>>()?;
         Ok(sources)
     }

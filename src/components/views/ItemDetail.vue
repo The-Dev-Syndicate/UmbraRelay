@@ -210,11 +210,12 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import type { Item } from '../../types';
-import { 
-  formatDate, 
-  stripHtml, 
+import {
+  formatDate,
+  stripHtml,
   parseGitHubNotificationSummary,
-  extractGitHubRepo
+  extractGitHubRepo,
+  decodeHtmlEntities
 } from '../../utils/formatting';
 import { useContent } from '../../composables/useContent';
 
@@ -237,17 +238,20 @@ const contentResolution = computed(() => getDisplayContent(item.value));
 
 // Polling interval for extraction status
 let pollingInterval: number | null = null;
+let pollAttempts = 0;
+const MAX_POLL_ATTEMPTS = 60; // Max 10 minutes at max interval
+const MAX_POLL_INTERVAL = 10000; // 10 seconds max interval
 
 const fetchItem = async () => {
-  loading.value = true;
-  error.value = null;
   try {
-    item.value = await invoke<Item>('get_item', { id: props.itemId });
+    const newItem = await invoke<Item>('get_item', { id: props.itemId });
+    if (newItem) {
+      item.value = newItem;
+      error.value = null;
+    }
   } catch (e) {
     error.value = e as string;
     console.error('Failed to fetch item:', e);
-  } finally {
-    loading.value = false;
   }
 };
 
@@ -260,18 +264,38 @@ watch(() => contentResolution.value.isFetching, (isFetching) => {
   }
 });
 
+const getNextPollInterval = (): number => {
+  // Exponential backoff: 500ms, 1s, 2s, 4s, 8s, 10s (max)
+  const interval = Math.min(500 * Math.pow(2, pollAttempts), MAX_POLL_INTERVAL);
+  return interval;
+};
+
 const startPolling = () => {
   stopPolling(); // Clear any existing interval
-  pollingInterval = window.setInterval(() => {
+  pollAttempts = 0;
+
+  const poll = () => {
+    if (pollAttempts >= MAX_POLL_ATTEMPTS) {
+      stopPolling();
+      return;
+    }
+
     fetchItem();
-  }, 2000); // Poll every 2 seconds
+    pollAttempts++;
+
+    const nextInterval = getNextPollInterval();
+    pollingInterval = window.setTimeout(poll, nextInterval);
+  };
+
+  poll(); // Start immediately
 };
 
 const stopPolling = () => {
   if (pollingInterval !== null) {
-    clearInterval(pollingInterval);
+    clearTimeout(pollingInterval);
     pollingInterval = null;
   }
+  pollAttempts = 0;
 };
 
 const updateState = async (state: 'unread' | 'read' | 'archived') => {
@@ -316,21 +340,19 @@ const hasValidSummary = computed(() => {
 
 // Get resolved content HTML
 const resolvedContentHtml = computed(() => {
-  const content = contentResolution.value.content;
+  let content = contentResolution.value.content;
   if (!content) return '';
-  
-  // Decode HTML entities
-  const textarea = document.createElement('textarea');
-  textarea.innerHTML = content;
-  let decoded = textarea.value;
-  
+
+  // Decode HTML entities efficiently
+  content = decodeHtmlEntities(content);
+
   // If we have a comments URL, remove "Comments" links from the content to avoid duplicates
   if (item.value?.comments) {
-    decoded = decoded.replace(/<a[^>]*>.*?[Cc]omment[s]?.*?<\/a>/gi, '');
-    decoded = decoded.replace(/\b[Cc]omment[s]?\b(?=\s|$|\.|,)/g, '');
+    content = content.replace(/<a[^>]*>.*?[Cc]omment[s]?.*?<\/a>/gi, '');
+    content = content.replace(/\b[Cc]omment[s]?\b(?=\s|$|\.|,)/g, '');
   }
-  
-  return decoded;
+
+  return content;
 });
 
 // Parse category JSON array string

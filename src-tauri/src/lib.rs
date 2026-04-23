@@ -582,10 +582,13 @@ pub async fn sync_source_internal(app: &tauri::AppHandle, source: storage::model
     use crate::ingestion::{RssIngester, AtomIngester, GitHubIngester, GitHubNotificationsIngester, traits::IngestSource};
     use crate::normalization::normalize_and_dedupe;
     use anyhow::Context;
-    
+    use std::time::Duration;
+
     let config: serde_json::Value = serde_json::from_str(&source.config_json)
         .context("Failed to parse source config")?;
-    
+
+    const SYNC_TIMEOUT: Duration = Duration::from_secs(300); // 5 minute timeout per source
+
     // Create appropriate ingester and poll (using spawn_blocking for blocking operations)
     let items = match source.source_type.as_str() {
         "rss" => {
@@ -593,12 +596,16 @@ pub async fn sync_source_internal(app: &tauri::AppHandle, source: storage::model
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| anyhow::anyhow!("Missing RSS URL in config"))?
                 .to_string();
-            
-            tokio::task::spawn_blocking(move || {
-                let ingester = RssIngester::new(url)?;
-                ingester.poll()
-            })
+
+            tokio::time::timeout(
+                SYNC_TIMEOUT,
+                tokio::task::spawn_blocking(move || {
+                    let ingester = RssIngester::new(url)?;
+                    ingester.poll()
+                })
+            )
             .await
+            .map_err(|_| anyhow::anyhow!("RSS sync timeout: operation took too long"))?
             .map_err(|e| anyhow::anyhow!("Task join error: {}", e))?
         }
         "atom" => {
@@ -606,12 +613,16 @@ pub async fn sync_source_internal(app: &tauri::AppHandle, source: storage::model
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| anyhow::anyhow!("Missing ATOM URL in config"))?
                 .to_string();
-            
-            tokio::task::spawn_blocking(move || {
-                let ingester = AtomIngester::new(url)?;
-                ingester.poll()
-            })
+
+            tokio::time::timeout(
+                SYNC_TIMEOUT,
+                tokio::task::spawn_blocking(move || {
+                    let ingester = AtomIngester::new(url)?;
+                    ingester.poll()
+                })
+            )
             .await
+            .map_err(|_| anyhow::anyhow!("Atom sync timeout: operation took too long"))?
             .map_err(|e| anyhow::anyhow!("Task join error: {}", e))?
         }
         "github" => {
@@ -682,21 +693,25 @@ pub async fn sync_source_internal(app: &tauri::AppHandle, source: storage::model
             let app_clone = app.clone();
             
             // First attempt with current token
-            let result = tokio::task::spawn_blocking({
-                let token_clone = token.clone();
-                let repositories_clone = repositories.clone();
-                let endpoints_clone = endpoints.clone();
-                move || {
-                    let ingester = GitHubIngester::new(
-                        secret_id_clone,
-                        token_clone,
-                        repositories_clone,
-                        endpoints_clone,
-                    )?;
-                    ingester.poll()
-                }
-            })
+            let result = tokio::time::timeout(
+                SYNC_TIMEOUT,
+                tokio::task::spawn_blocking({
+                    let token_clone = token.clone();
+                    let repositories_clone = repositories.clone();
+                    let endpoints_clone = endpoints.clone();
+                    move || {
+                        let ingester = GitHubIngester::new(
+                            secret_id_clone,
+                            token_clone,
+                            repositories_clone,
+                            endpoints_clone,
+                        )?;
+                        ingester.poll()
+                    }
+                })
+            )
             .await
+            .map_err(|_| anyhow::anyhow!("GitHub sync timeout: operation took too long"))?
             .map_err(|e| anyhow::anyhow!("Task join error: {}", e))?;
             
             // Check if we got a 401 error
@@ -711,16 +726,20 @@ pub async fn sync_source_internal(app: &tauri::AppHandle, source: storage::model
                                 // Retry with new token
                                 let repositories_retry = repositories.clone();
                                 let endpoints_retry = endpoints.clone();
-                                tokio::task::spawn_blocking(move || {
-                                    let ingester = GitHubIngester::new(
-                                        secret_id_clone,
-                                        new_token,
-                                        repositories_retry,
-                                        endpoints_retry,
-                                    )?;
-                                    ingester.poll()
-                                })
+                                tokio::time::timeout(
+                                    SYNC_TIMEOUT,
+                                    tokio::task::spawn_blocking(move || {
+                                        let ingester = GitHubIngester::new(
+                                            secret_id_clone,
+                                            new_token,
+                                            repositories_retry,
+                                            endpoints_retry,
+                                        )?;
+                                        ingester.poll()
+                                    })
+                                )
                                 .await
+                                .map_err(|_| anyhow::anyhow!("GitHub sync retry timeout: operation took too long"))?
                                 .map_err(|e| anyhow::anyhow!("Task join error: {}", e))?
                             }
                             Err(_) => {
